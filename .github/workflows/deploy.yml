@@ -65,4 +65,5 @@ jobs:
           username: root
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            lftp -u '${{ secrets.FTP_USER }},${{ secrets.FTP_PASS }}' 87.232.64.20 -e "set ssl:verify-certificate no; mirror -R --delete /opt/caos/frontend/dist/ /www/caos.thinkred.ru/; quit"
+            cp -a /opt/caos/frontend/dist/* /var/www/caos.thinkred.ru/
+            lftp -u '${{ secrets.FTP_USER }},${{ secrets.FTP_PASS }}' 87.232.64.20 -e "set ftp:ssl-allow no; mirror -R --delete /opt/caos/frontend/dist/ /www/caos.thinkred.ru/; quit"
