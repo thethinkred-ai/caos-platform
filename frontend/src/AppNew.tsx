@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { OnboardingTour } from "./OnboardingTour";
 
 type User = { id: number; email: string; display_name: string; bio: string };
 type Problem = { id: number; title: string; description: string; status: string; author_id: number };
@@ -501,6 +502,7 @@ export default function AppNew() {
 
   return (
     <div className="app-shell">
+      <OnboardingTour onComplete={() => {}} />
       <aside>
         <div className="brand">
           <span className="brand-mark">C</span>
