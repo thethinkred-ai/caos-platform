@@ -446,8 +446,15 @@ export default function AppNew() {
               <span className="stepik-icon">S</span>
               Войти через Stepik
             </a>
+            <a
+              className="google-login-btn"
+              href={`${API_URL}/auth/google`}
+            >
+              <span className="google-icon">G</span>
+              Войти через Google
+            </a>
             {error && error.includes("auth_failed") && (
-              <p className="error">Не удалось войти через Stepik. Попробуйте ещё раз.</p>
+              <p className="error">Не удалось войти. Попробуйте ещё раз.</p>
             )}
           </div>
           <div className="stepik-courses-preview">

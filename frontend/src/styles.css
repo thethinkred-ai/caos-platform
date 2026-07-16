@@ -30,6 +30,9 @@
 .stepik-login-section{margin-top:24px}
 .stepik-login-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px 18px;border-radius:10px;background:#3049d8;color:#fff;font-weight:600;font-size:15px;text-decoration:none;transition:background .2s}
 .stepik-login-btn:hover{background:#2940b8}
+.google-login-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px 18px;border-radius:10px;background:#fff;color:#3c4043;font-weight:600;font-size:15px;text-decoration:none;border:1px solid #dadce0;transition:background .2s;margin-top:10px}
+.google-login-btn:hover{background:#f8f9fa}
+.google-icon{display:grid;place-items:center;width:28px;height:28px;background:#4285f4;color:#fff;border-radius:7px;font:700 16px 'Space Grotesk';flex-shrink:0}
 .stepik-icon{display:grid;place-items:center;width:28px;height:28px;background:#fff;color:#3049d8;border-radius:7px;font:700 16px 'Space Grotesk';flex-shrink:0}
 .auth-divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:#8f9bb7;font-size:13px}
 .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:#e6eaf1}

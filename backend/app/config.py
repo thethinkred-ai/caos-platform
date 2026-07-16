@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     stepik_redirect_uri: str = "http://localhost:8000/api/v1/auth/stepik/callback"
     frontend_url: str = "http://localhost:5173"
     stepik_course_ids: str = "288738,288774,285340"
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .db import Base, engine
-from .routers import ai, auth, competences, dashboard, entities, knowledge, notifications, search, stepik
+from .routers import ai, auth, competences, dashboard, entities, google, knowledge, notifications, search, stepik
 
 settings = get_settings()
 Base.metadata.create_all(bind=engine)
@@ -32,3 +32,4 @@ app.include_router(ai.router, prefix="/api/v1", tags=["ai"])
 app.include_router(notifications.router, prefix="/api/v1", tags=["notifications"])
 app.include_router(competences.router, prefix="/api/v1", tags=["competences"])
 app.include_router(stepik.router, prefix="/api/v1", tags=["stepik"])
+app.include_router(google.router, prefix="/api/v1", tags=["google"])
