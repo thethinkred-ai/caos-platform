@@ -24,6 +24,8 @@ def list_problems(db: Db) -> list[Problem]:
 def create_problem(payload: ProblemCreate, db: Db, user: CurrentUser) -> Problem:
     item = Problem(**payload.model_dump(), author_id=user.id)
     db.add(item)
+    db.flush()
+    db.add(AuditEvent(actor_id=user.id, entity_type="problem", entity_id=item.id, action="created", detail=item.title))
     db.commit()
     db.refresh(item)
     return item
@@ -42,6 +44,8 @@ def create_goal(payload: GoalCreate, db: Db, user: CurrentUser) -> Goal:
         raise HTTPException(status_code=404, detail="Parent goal not found")
     item = Goal(**payload.model_dump(), owner_id=user.id)
     db.add(item)
+    db.flush()
+    db.add(AuditEvent(actor_id=user.id, entity_type="goal", entity_id=item.id, action="created", detail=item.title))
     db.commit()
     db.refresh(item)
     return item
@@ -120,6 +124,8 @@ def create_project(payload: ProjectCreate, db: Db, user: CurrentUser) -> Project
         raise HTTPException(status_code=404, detail="Goal not found")
     item = Project(**payload.model_dump(), owner_id=user.id)
     db.add(item)
+    db.flush()
+    db.add(AuditEvent(actor_id=user.id, entity_type="project", entity_id=item.id, action="created", detail=item.title))
     db.commit()
     db.refresh(item)
     return item
@@ -260,6 +266,7 @@ def complete_task(task_id: int, db: Db, user: CurrentUser) -> Task:
         raise HTTPException(status_code=403, detail="Project membership required")
     item.status = "done"
     db.add(AuditEvent(actor_id=user.id, entity_type="task", entity_id=task_id, action="completed", detail=item.title))
+    db.add(Notification(user_id=user.id, entity_type="task", entity_id=task_id, message=f"Task '{item.title}' completed"))
     db.commit()
     db.refresh(item)
     return item
@@ -278,6 +285,8 @@ def assign_task(task_id: int, payload: TaskAssign, db: Db, user: CurrentUser) ->
             raise HTTPException(status_code=404, detail="Assignee user not found")
     item.assignee_id = payload.assignee_id
     db.add(AuditEvent(actor_id=user.id, entity_type="task", entity_id=task_id, action="assigned", detail=item.title))
+    if payload.assignee_id is not None:
+        db.add(Notification(user_id=payload.assignee_id, entity_type="task", entity_id=task_id, message=f"Task '{item.title}' assigned to you"))
     db.commit()
     db.refresh(item)
     return item

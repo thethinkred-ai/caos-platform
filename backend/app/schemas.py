@@ -162,6 +162,7 @@ class KnowledgeOut(KnowledgeCreate):
     id: int
     author_id: int
     created_at: datetime
+    project_name: str | None = None
 
 
 class AuditEventOut(BaseModel):

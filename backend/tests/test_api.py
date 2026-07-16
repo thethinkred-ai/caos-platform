@@ -293,3 +293,72 @@ def test_ai_status_and_stub_fallback() -> None:
     assert rec.status_code == 200
     assert rec.json()["source"] in ("keyword-match", "stub", "heuristic")
     assert rec.json()["confidence"] < 0.5
+
+
+def test_task_completion_notification() -> None:
+    token = client.post("/api/v1/auth/register", json={"email": "tasknotif@example.com", "password": "password123", "display_name": "TaskNotif"}).json()["access_token"]
+    h = {"Authorization": f"Bearer {token}"}
+    project = client.post("/api/v1/projects", headers=h, json={"title": "Notif project", "description": "For task notif test."})
+    project_id = project.json()["id"]
+    task = client.post(f"/api/v1/projects/{project_id}/tasks", headers=h, json={"title": "Notif task", "description": "Will be completed."})
+    task_id = task.json()["id"]
+    client.patch(f"/api/v1/tasks/{task_id}/complete", headers=h)
+    notifs = client.get("/api/v1/notifications", headers=h)
+    assert notifs.status_code == 200
+    task_notifs = [n for n in notifs.json() if n["entity_type"] == "task"]
+    assert len(task_notifs) >= 1
+    assert "completed" in task_notifs[0]["message"]
+
+
+def test_task_assignment_notification() -> None:
+    token = client.post("/api/v1/auth/register", json={"email": "assignnotif@example.com", "password": "password123", "display_name": "AssignNotif"}).json()["access_token"]
+    h = {"Authorization": f"Bearer {token}"}
+    project = client.post("/api/v1/projects", headers=h, json={"title": "Assign notif project", "description": "For assignment notif."})
+    project_id = project.json()["id"]
+    task = client.post(f"/api/v1/projects/{project_id}/tasks", headers=h, json={"title": "Assign notif task", "description": "Will be assigned."})
+    task_id = task.json()["id"]
+    user_id = client.get("/api/v1/auth/me", headers=h).json()["id"]
+    client.patch(f"/api/v1/tasks/{task_id}/assign", headers=h, json={"assignee_id": user_id})
+    notifs = client.get("/api/v1/notifications", headers=h)
+    assign_notifs = [n for n in notifs.json() if n["entity_type"] == "task" and "assigned" in n["message"]]
+    assert len(assign_notifs) >= 1
+
+
+def test_audit_on_entity_creation() -> None:
+    token = client.post("/api/v1/auth/register", json={"email": "auditcreate@example.com", "password": "password123", "display_name": "AuditCreate"}).json()["access_token"]
+    h = {"Authorization": f"Bearer {token}"}
+    client.post("/api/v1/problems", headers=h, json={"title": "Audit problem", "description": "For audit test."})
+    client.post("/api/v1/goals", headers=h, json={"title": "Audit goal", "description": "For audit test."})
+    client.post("/api/v1/projects", headers=h, json={"title": "Audit project", "description": "For audit test."})
+    audit = client.get("/api/v1/audit", headers=h)
+    assert audit.status_code == 200
+    entity_types = [ev["entity_type"] for ev in audit.json()]
+    assert "problem" in entity_types
+    assert "goal" in entity_types
+    assert "project" in entity_types
+
+
+def test_knowledge_project_name() -> None:
+    token = client.post("/api/v1/auth/register", json={"email": "kpname@example.com", "password": "password123", "display_name": "KPName"}).json()["access_token"]
+    h = {"Authorization": f"Bearer {token}"}
+    project = client.post("/api/v1/projects", headers=h, json={"title": "Knowledge project", "description": "For knowledge project name."})
+    project_id = project.json()["id"]
+    client.post("/api/v1/knowledge", headers=h, json={"title": "Linked knowledge", "content": "With project.", "project_id": project_id})
+    items = client.get("/api/v1/knowledge", headers=h)
+    assert items.status_code == 200
+    linked = [k for k in items.json() if k.get("project_id") == project_id]
+    assert len(linked) == 1
+    assert linked[0]["project_name"] == "Knowledge project"
+
+
+def test_stepik_oauth_redirect() -> None:
+    response = client.get("/api/v1/auth/stepik", follow_redirects=False)
+    # Without STEPIK_CLIENT_ID configured, should return 503
+    assert response.status_code == 503
+
+
+def test_stepik_oauth_callback_missing_code() -> None:
+    response = client.get("/api/v1/auth/stepik/callback", follow_redirects=False)
+    # Missing code should redirect to frontend with error
+    assert response.status_code == 307
+    assert "error=missing_code" in response.headers["location"]

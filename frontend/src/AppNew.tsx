@@ -8,7 +8,7 @@ type Project = { id: number; title: string; description: string; status: string;
 type Team = { id: number; name: string; description: string; owner_id: number };
 type Decision = { id: number; title: string; proposal: string; status: string; goal_id: number | null; author_id: number };
 type DecisionEvent = { id: number; decision_id: number; author_id: number; event_type: string; content: string; created_at: string };
-type KnowledgeItem = { id: number; title: string; content: string; project_id: number | null; author_id: number };
+type KnowledgeItem = { id: number; title: string; content: string; project_id: number | null; author_id: number; project_name: string | null; created_at: string };
 type NextAction = { label: string; section: string; reason: string };
 type Notification = { id: number; user_id: number; entity_type: string; entity_id: number; message: string; is_read: boolean; created_at: string };
 type AuditEvent = { id: number; actor_id: number; entity_type: string; entity_id: number; action: string; detail: string; created_at: string };
@@ -78,6 +78,7 @@ export default function AppNew() {
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
   const [knowledgeProjectId, setKnowledgeProjectId] = useState<number | null>(null);
+  const [knowledgeFilterProjectId, setKnowledgeFilterProjectId] = useState<number | null>(null);
   const [aiStatus, setAiStatus] = useState<{ llm_available: boolean; model: string | null; base_url: string | null } | null>(null);
   const [selectedDecisionId, setSelectedDecisionId] = useState<number | null>(null);
   const [decisionEvents, setDecisionEvents] = useState<DecisionEvent[]>([]);
@@ -128,6 +129,19 @@ export default function AppNew() {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenParam = params.get("token");
+    if (tokenParam) {
+      localStorage.setItem("caos_token", tokenParam);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      request<User>("/auth/me")
+        .then((current) => {
+          setUser(current);
+          return loadData();
+        })
+        .catch(() => localStorage.removeItem("caos_token"));
+      return;
+    }
     if (localStorage.getItem("caos_token"))
       request<User>("/auth/me")
         .then((current) => {
@@ -417,6 +431,21 @@ export default function AppNew() {
           <p className="muted">
             Находите общие задачи, формулируйте цели и превращайте их в совместные проекты.
           </p>
+          <div className="stepik-login-section">
+            <a
+              className="stepik-login-btn"
+              href={`${API_URL}/auth/stepik`}
+            >
+              <span className="stepik-icon">S</span>
+              Войти через Stepik
+            </a>
+            {error && error.includes("auth_failed") && (
+              <p className="error">Не удалось войти через Stepik. Попробуйте ещё раз.</p>
+            )}
+          </div>
+          <div className="auth-divider">
+            <span>или</span>
+          </div>
           <form onSubmit={submitAuth}>
             <h2>{mode === "register" ? "Создать аккаунт" : "Войти"}</h2>
             {mode === "register" && (
@@ -439,7 +468,7 @@ export default function AppNew() {
             />
             <button type="submit">{mode === "register" ? "Начать работу" : "Войти"}</button>
           </form>
-          {error && <p className="error">{error}</p>}
+          {error && !error.includes("auth_failed") && <p className="error">{error}</p>}
           <button
             className="link-button"
             onClick={() => {
@@ -465,18 +494,22 @@ export default function AppNew() {
         </div>
         <p className="side-caption">Collective Activity Operating System</p>
         <nav>
-          {(Object.keys(labels) as Section[]).map((key) => (
-            <button
-              key={key}
-              className={section === key ? "active" : ""}
-              onClick={() => {
-                setSection(key);
-                setError("");
-              }}
-            >
-              {labels[key]}
-            </button>
-          ))}
+          {(Object.keys(labels) as Section[]).map((key) => {
+            const unreadCount = key === "notifications" ? notifications.filter((n) => !n.is_read).length : 0;
+            return (
+              <button
+                key={key}
+                className={section === key ? "active" : ""}
+                onClick={() => {
+                  setSection(key);
+                  setError("");
+                }}
+              >
+                {labels[key]}
+                {unreadCount > 0 && <span className="nav-badge">{unreadCount}</span>}
+              </button>
+            );
+          })}
         </nav>
         <button
           className="logout"
@@ -951,24 +984,29 @@ export default function AppNew() {
                 </div>
               )}
               {selectedDecisionId && decisionEvents.length > 0 && (
-                <div className="decision-events">
+                <div className="decision-events inline-events">
                   <h3>События решения #{selectedDecisionId}</h3>
-                  {decisionEvents.map((ev) => (
-                    <article key={ev.id} className="decision-event">
-                      <small>{ev.event_type}</small>
-                      <p>{ev.content}</p>
-                    </article>
-                  ))}
+                  <div className="event-timeline">
+                    {decisionEvents.map((ev) => (
+                      <div key={ev.id} className={`event-timeline-item event-type-${ev.event_type}`}>
+                        <span className="event-type-badge">{ev.event_type}</span>
+                        <p>{ev.content}</p>
+                        <small>{new Date(ev.created_at).toLocaleString("ru-RU")}</small>
+                      </div>
+                    ))}
+                  </div>
                   <div className="event-actions">
                     <textarea
                       placeholder="Комментарий к событию"
                       value={eventContent}
                       onChange={(e) => setEventContent(e.target.value)}
                     />
-                    <button onClick={() => addDecisionEvent("accepted")}>Принять</button>
-                    <button onClick={() => addDecisionEvent("rejected")}>Отклонить</button>
-                    <button onClick={() => addDecisionEvent("revised")}>Пересмотреть</button>
-                    <button onClick={() => addDecisionEvent("comment")}>Комментарий</button>
+                    <div className="event-buttons">
+                      <button onClick={() => addDecisionEvent("accepted")}>Принять</button>
+                      <button onClick={() => addDecisionEvent("rejected")}>Отклонить</button>
+                      <button onClick={() => addDecisionEvent("revised")}>Пересмотреть</button>
+                      <button onClick={() => addDecisionEvent("comment")}>Комментарий</button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1020,7 +1058,18 @@ export default function AppNew() {
                   <span className="eyebrow">Коллективный опыт</span>
                   <h2>База знаний</h2>
                 </div>
-                <span className="count">{knowledge.length}</span>
+                <span className="count">{knowledge.filter((k) => knowledgeFilterProjectId === null || k.project_id === knowledgeFilterProjectId).length}</span>
+              </div>
+              <div className="knowledge-filter">
+                <select
+                  value={knowledgeFilterProjectId ?? ""}
+                  onChange={(e) => setKnowledgeFilterProjectId(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Все записи</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.title}</option>
+                  ))}
+                </select>
               </div>
               {knowledge.length === 0 ? (
                 <p className="muted empty">
@@ -1028,7 +1077,9 @@ export default function AppNew() {
                 </p>
               ) : (
                 <div className="problem-list">
-                  {knowledge.map((item) => (
+                  {knowledge
+                    .filter((k) => knowledgeFilterProjectId === null || k.project_id === knowledgeFilterProjectId)
+                    .map((item) => (
                     <article key={item.id}>
                       <span className="problem-icon">✦</span>
                       <div>
@@ -1036,11 +1087,15 @@ export default function AppNew() {
                         <p>{item.content}</p>
                         <small>
                           Знание · #{item.id}
-                          {item.project_id && ` · проект #${item.project_id}`}
+                          {item.project_name && ` · проект: ${item.project_name}`}
+                          {item.created_at && ` · ${new Date(item.created_at).toLocaleDateString("ru-RU")}`}
                         </small>
                       </div>
                     </article>
                   ))}
+                  {knowledge.filter((k) => knowledgeFilterProjectId === null || k.project_id === knowledgeFilterProjectId).length === 0 && (
+                    <p className="muted empty">Нет записей для выбранного проекта.</p>
+                  )}
                 </div>
               )}
             </section>
@@ -1118,6 +1173,7 @@ export default function AppNew() {
                         <h3>{n.message}</h3>
                         <small>
                           {n.entity_type} #{n.entity_id} — {n.is_read ? "прочитано" : "непрочитано"}
+                          {n.created_at && ` · ${new Date(n.created_at).toLocaleString("ru-RU")}`}
                         </small>
                         {!n.is_read && (
                           <button className="link-button" onClick={() => markNotificationRead(n.id)}>
@@ -1154,7 +1210,7 @@ export default function AppNew() {
                         <h3>{ev.action}</h3>
                         <p>{ev.detail}</p>
                         <small>
-                          {ev.entity_type} #{ev.entity_id}
+                          {ev.entity_type} #{ev.entity_id} · {new Date(ev.created_at).toLocaleString("ru-RU")}
                         </small>
                       </div>
                     </article>
