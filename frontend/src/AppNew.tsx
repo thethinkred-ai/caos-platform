@@ -92,6 +92,8 @@ export default function AppNew() {
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"login" | "register">("register");
   const [stepikCourses, setStepikCourses] = useState<{ id: number; title: string; slug: string; url: string; learners_count: number; sections_count: number }[]>([]);
+  const [aiRecommendation, setAiRecommendation] = useState<{ goalId: number; suggestion: string; source: string; confidence: number } | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const loadData = async () => {
     try {
@@ -328,6 +330,21 @@ export default function AppNew() {
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось создать цель");
+    }
+  };
+
+  const decomposeGoal = async (goalId: number) => {
+    setAiLoading(true);
+    setAiRecommendation(null);
+    try {
+      const rec = await request<{ suggestion: string; source: string; confidence: number }>(
+        `/recommendations/decompose/${goalId}`
+      );
+      setAiRecommendation({ goalId, ...rec });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "AI недоступен");
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -783,6 +800,26 @@ export default function AppNew() {
                           {item.status} · #{item.id}
                           {"parent_goal_id" in item && item.parent_goal_id && ` · sub-goal of #${item.parent_goal_id}`}
                         </small>
+                        {section === "goals" && (
+                          <div className="ai-section">
+                            <button
+                              className="ai-btn"
+                              onClick={() => decomposeGoal(item.id)}
+                              disabled={aiLoading}
+                            >
+                              {aiLoading && aiRecommendation?.goalId === item.id ? "AI думает..." : "AI: разбить на подзадачи"}
+                            </button>
+                            {aiRecommendation && aiRecommendation.goalId === item.id && (
+                              <div className="ai-recommendation">
+                                <div className="ai-rec-header">
+                                  <span className="ai-badge">AI · {aiRecommendation.source}</span>
+                                  <span className="ai-confidence">{Math.round(aiRecommendation.confidence * 100)}%</span>
+                                </div>
+                                <p>{aiRecommendation.suggestion}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         {section === "projects" && (
                           <div className="status-buttons">
                             {item.status !== "active" && (
