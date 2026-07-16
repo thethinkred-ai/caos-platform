@@ -94,6 +94,24 @@ export default function AppNew() {
   const [stepikCourses, setStepikCourses] = useState<{ id: number; title: string; slug: string; url: string; learners_count: number; sections_count: number }[]>([]);
   const [aiRecommendation, setAiRecommendation] = useState<{ goalId: number; suggestion: string; source: string; confidence: number } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiAction, setAiAction] = useState("");
+
+  const callAi = async (endpoint: string, goalId: number, label: string) => {
+    setAiLoading(true);
+    setAiAction(label);
+    setAiRecommendation(null);
+    try {
+      const rec = await request<{ suggestion: string; source: string; confidence: number }>(
+        `/recommendations/${endpoint}/${goalId}`
+      );
+      setAiRecommendation({ goalId, ...rec });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "AI недоступен");
+    } finally {
+      setAiLoading(false);
+      setAiAction("");
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -330,21 +348,6 @@ export default function AppNew() {
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось создать цель");
-    }
-  };
-
-  const decomposeGoal = async (goalId: number) => {
-    setAiLoading(true);
-    setAiRecommendation(null);
-    try {
-      const rec = await request<{ suggestion: string; source: string; confidence: number }>(
-        `/recommendations/decompose/${goalId}`
-      );
-      setAiRecommendation({ goalId, ...rec });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "AI недоступен");
-    } finally {
-      setAiLoading(false);
     }
   };
 
@@ -802,13 +805,23 @@ export default function AppNew() {
                         </small>
                         {section === "goals" && (
                           <div className="ai-section">
-                            <button
-                              className="ai-btn"
-                              onClick={() => decomposeGoal(item.id)}
-                              disabled={aiLoading}
-                            >
-                              {aiLoading && aiRecommendation?.goalId === item.id ? "AI думает..." : "AI: разбить на подзадачи"}
-                            </button>
+                            <div className="ai-buttons">
+                              <button className="ai-btn" onClick={() => callAi("decompose", item.id, "декомпозиция")} disabled={aiLoading}>
+                                {aiLoading && aiAction === "декомпозиция" ? "..." : "Декомпозиция"}
+                              </button>
+                              <button className="ai-btn" onClick={() => callAi("similar-goals", item.id, "совпадения")} disabled={aiLoading}>
+                                {aiLoading && aiAction === "совпадения" ? "..." : "Совпадения"}
+                              </button>
+                              <button className="ai-btn" onClick={() => callAi("duplicate-goals", item.id, "дубликаты")} disabled={aiLoading}>
+                                {aiLoading && aiAction === "дубликаты" ? "..." : "Дубликаты"}
+                              </button>
+                              <button className="ai-btn" onClick={() => callAi("missing-competences", item.id, "компетенции")} disabled={aiLoading}>
+                                {aiLoading && aiAction === "компетенции" ? "..." : "Компетенции"}
+                              </button>
+                              <button className="ai-btn" onClick={() => callAi("goal-context", item.id, "контекст")} disabled={aiLoading}>
+                                {aiLoading && aiAction === "контекст" ? "..." : "Контекст"}
+                              </button>
+                            </div>
                             {aiRecommendation && aiRecommendation.goalId === item.id && (
                               <div className="ai-recommendation">
                                 <div className="ai-rec-header">

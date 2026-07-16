@@ -8,7 +8,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
 from ..llm import is_llm_available, llm_complete_sync
-from ..models import Goal, KnowledgeItem, Problem, Project, User
+from ..models import AuditEvent, Competence, Decision, DecisionEvent, Goal, KnowledgeItem, Problem, Project, User
 from ..schemas import AIRecommendation
 
 router = APIRouter()
@@ -154,6 +154,114 @@ def decompose_goal(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
     if is_llm_available():
         return _llm_decompose_goal(db, goal_id)
     return _stub_decompose_goal(db, goal_id)
+
+
+def _llm_similar_goals(db: Session, goal_id: int) -> AIRecommendation:
+    goal = db.get(Goal, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    others = list(db.scalars(select(Goal).where(Goal.id != goal_id).limit(10)))
+    context = f"Цель: {goal.title}\nОписание: {goal.description}\n\nДругие цели:\n"
+    context += "\n".join(f"- {g.title}: {g.description[:80]}" for g in others) or "Нет других целей."
+    answer = llm_complete_sync(
+        SYSTEM_PROMPT,
+        f"Найди 3 наиболее близкие цели из списка ниже. Для каждой объясни, почему они совпадают или пересекаются, и предложи объединить усилия если это уместно.\n{context}",
+    )
+    if not answer:
+        return AIRecommendation(suggestion="Похожие цели не найдены.", source="stub", confidence=0.0)
+    return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
+
+
+def _llm_duplicate_goals(db: Session, goal_id: int) -> AIRecommendation:
+    goal = db.get(Goal, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    others = list(db.scalars(select(Goal).where(Goal.id != goal_id).limit(10)))
+    context = f"Цель: {goal.title}\nОписание: {goal.description}\n\nДругие цели:\n"
+    context += "\n".join(f"- {g.title}: {g.description[:80]}" for g in others) or "Нет других целей."
+    answer = llm_complete_sync(
+        SYSTEM_PROMPT,
+        f"Проанализируй, есть ли цели-дубликаты, которые преследуют тот же результат, но расходуют ресурсы независимо. Предложи координацию.\n{context}",
+    )
+    if not answer:
+        return AIRecommendation(suggestion="Дубликатов не обнаружено.", source="stub", confidence=0.0)
+    return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
+
+
+def _llm_missing_competences(db: Session, goal_id: int) -> AIRecommendation:
+    goal = db.get(Goal, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    projects = list(db.scalars(select(Project).where(Project.goal_id == goal_id).limit(5)))
+    all_comps = list(db.scalars(select(Competence).limit(20)))
+    context = f"Цель: {goal.title}\nОписание: {goal.description}\n"
+    if projects:
+        context += "Проекты:\n" + "\n".join(f"- {p.title} ({p.status})" for p in projects)
+    if all_comps:
+        context += "\n\nДоступные компетенции участников:\n" + "\n".join(f"- {c.name} (уровень {c.level})" for c in all_comps)
+    else:
+        context += "\n\nКомпетенции участников пока не заполнены."
+    answer = llm_complete_sync(
+        SYSTEM_PROMPT,
+        f"Проанализируя требования цели и доступные компетенции участников, определи, каких компетенций не хватает для достижения цели. Предложи, какие навыки нужно найти.\n{context}",
+    )
+    if not answer:
+        return AIRecommendation(suggestion="Недостающие компетенции не определены.", source="stub", confidence=0.0)
+    return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
+
+
+def _llm_goal_context(db: Session, goal_id: int) -> AIRecommendation:
+    goal = db.get(Goal, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    projects = list(db.scalars(select(Project).where(Project.goal_id == goal_id).limit(5)))
+    decisions = list(db.scalars(select(Decision).where(Decision.goal_id == goal_id).limit(5)))
+    events = list(db.scalars(select(DecisionEvent).where(DecisionEvent.decision_id.in_([d.id for d in decisions])).limit(10)))
+    audits = list(db.scalars(select(AuditEvent).where(AuditEvent.entity_type == "goal", AuditEvent.entity_id == goal_id).limit(10)))
+    context = f"Цель: {goal.title}\nОписание: {goal.description}\nСтатус: {goal.status}\n"
+    if projects:
+        context += f"\nПроекты ({len(projects)}):\n" + "\n".join(f"- {p.title} ({p.status})" for p in projects)
+    if decisions:
+        context += f"\nРешения ({len(decisions)}):\n" + "\n".join(f"- {d.title} ({d.status})" for d in decisions)
+    if events:
+        context += f"\nСобытия решений ({len(events)}):\n" + "\n".join(f"- {e.event_type}: {e.content[:60]}" for e in events)
+    if audits:
+        context += f"\nЖурнал ({len(audits)}):\n" + "\n".join(f"- {a.action}: {a.detail}" for a in audits)
+    answer = llm_complete_sync(
+        SYSTEM_PROMPT,
+        f"Подготовь сжатый контекст для нового участника: как возникла цель, какие решения приняты, кто в чём участвует, какие варианты были отвергнуты. Объём — 3-5 предложений.\n{context}",
+    )
+    if not answer:
+        return AIRecommendation(suggestion="Контекст недоступен.", source="stub", confidence=0.0)
+    return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
+
+
+@router.get("/recommendations/similar-goals/{goal_id}", response_model=AIRecommendation)
+def similar_goals(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
+    if is_llm_available():
+        return _llm_similar_goals(db, goal_id)
+    return AIRecommendation(suggestion="AI-поиск совпадающих целей будет подключён после настройки LLM.", source="stub", confidence=0.0)
+
+
+@router.get("/recommendations/duplicate-goals/{goal_id}", response_model=AIRecommendation)
+def duplicate_goals(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
+    if is_llm_available():
+        return _llm_duplicate_goals(db, goal_id)
+    return AIRecommendation(suggestion="AI-поиск дубликатов будет подключён после настройки LLM.", source="stub", confidence=0.0)
+
+
+@router.get("/recommendations/missing-competences/{goal_id}", response_model=AIRecommendation)
+def missing_competences(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
+    if is_llm_available():
+        return _llm_missing_competences(db, goal_id)
+    return AIRecommendation(suggestion="AI-анализ компетенций будет подключён после настройки LLM.", source="stub", confidence=0.0)
+
+
+@router.get("/recommendations/goal-context/{goal_id}", response_model=AIRecommendation)
+def goal_context(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
+    if is_llm_available():
+        return _llm_goal_context(db, goal_id)
+    return AIRecommendation(suggestion="AI-восстановление контекста будет подключено после настройки LLM.", source="stub", confidence=0.0)
 
 
 @router.get("/ai/status")
