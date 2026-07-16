@@ -91,6 +91,7 @@ export default function AppNew() {
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"login" | "register">("register");
+  const [stepikCourses, setStepikCourses] = useState<{ id: number; title: string; slug: string; url: string; learners_count: number; sections_count: number }[]>([]);
 
   const loadData = async () => {
     try {
@@ -122,6 +123,12 @@ export default function AppNew() {
         setAiStatus(ai);
       } catch {
         setAiStatus({ llm_available: false, model: null, base_url: null });
+      }
+      try {
+        const courses = await request<{ courses: typeof stepikCourses }>("/auth/stepik/courses");
+        setStepikCourses(courses.courses);
+      } catch {
+        setStepikCourses([]);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки данных");
@@ -443,41 +450,21 @@ export default function AppNew() {
               <p className="error">Не удалось войти через Stepik. Попробуйте ещё раз.</p>
             )}
           </div>
-          <div className="auth-divider">
-            <span>или</span>
+          <div className="stepik-courses-preview">
+            <h3>Наши курсы на Stepik:</h3>
+            <a className="course-link" href="https://stepik.org/course/288738" target="_blank" rel="noopener">
+              <span className="course-icon">H</span>
+              Наука логики Гегеля
+            </a>
+            <a className="course-link" href="https://stepik.org/course/288774" target="_blank" rel="noopener">
+              <span className="course-icon">K</span>
+              Капитал Маркса
+            </a>
+            <a className="course-link" href="https://stepik.org/course/285340" target="_blank" rel="noopener">
+              <span className="course-icon">L</span>
+              Ленин «Карл Маркс»
+            </a>
           </div>
-          <form onSubmit={submitAuth}>
-            <h2>{mode === "register" ? "Создать аккаунт" : "Войти"}</h2>
-            {mode === "register" && (
-              <input
-                placeholder="Ваше имя"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                required
-                minLength={2}
-              />
-            )}
-            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <input
-              type="password"
-              placeholder="Пароль (не менее 8 символов)"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-            />
-            <button type="submit">{mode === "register" ? "Начать работу" : "Войти"}</button>
-          </form>
-          {error && !error.includes("auth_failed") && <p className="error">{error}</p>}
-          <button
-            className="link-button"
-            onClick={() => {
-              setMode(mode === "register" ? "login" : "register");
-              setError("");
-            }}
-          >
-            {mode === "register" ? "Уже есть аккаунт? Войти" : "Создать новый аккаунт"}
-          </button>
         </div>
       </main>
     );
@@ -1145,6 +1132,27 @@ export default function AppNew() {
                 </p>
               </div>
             </section>
+            {stepikCourses.length > 0 && (
+              <section className="panel">
+                <div className="panel-heading">
+                  <div>
+                    <span className="eyebrow">Stepik</span>
+                    <h2>Наши курсы</h2>
+                  </div>
+                </div>
+                <div className="stepik-courses-list">
+                  {stepikCourses.map((c) => (
+                    <a key={c.id} className="course-link" href={c.url} target="_blank" rel="noopener">
+                      <span className="course-icon">{c.slug[0].toUpperCase()}</span>
+                      <div>
+                        <div>{c.title}</div>
+                        <div className="course-meta">{c.learners_count} студентов · {c.sections_count} разделов</div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
 
