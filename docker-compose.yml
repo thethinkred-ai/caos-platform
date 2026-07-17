@@ -21,6 +21,7 @@ services:
 
   backend:
     build: ./backend
+    dns_search: ["."]
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-caos}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:-caos}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
