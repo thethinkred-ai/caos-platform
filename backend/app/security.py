@@ -7,6 +7,9 @@ import jwt
 
 from .config import get_settings
 
+COOKIE_NAME = "caos_token"
+REFRESH_COOKIE_NAME = "caos_refresh"
+
 
 def hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
@@ -28,9 +31,52 @@ def verify_password(password: str, encoded: str) -> bool:
 def create_access_token(user_id: int) -> str:
     settings = get_settings()
     expires = datetime.now(UTC) + timedelta(minutes=settings.access_token_minutes)
-    return jwt.encode({"sub": str(user_id), "exp": expires}, settings.jwt_secret, algorithm="HS256")
+    jti = secrets.token_hex(16)
+    return jwt.encode({"sub": str(user_id), "exp": expires, "jti": jti, "type": "access"}, settings.jwt_secret, algorithm="HS256")
+
+
+def create_refresh_token(user_id: int) -> str:
+    settings = get_settings()
+    expires = datetime.now(UTC) + timedelta(days=settings.refresh_token_days)
+    jti = secrets.token_hex(16)
+    return jwt.encode({"sub": str(user_id), "exp": expires, "jti": jti, "type": "refresh"}, settings.jwt_secret, algorithm="HS256")
 
 
 def decode_access_token(token: str) -> int:
     payload = jwt.decode(token, get_settings().jwt_secret, algorithms=["HS256"])
+    if payload.get("type") != "access":
+        raise jwt.InvalidTokenError("Not an access token")
     return int(payload["sub"])
+
+
+def decode_refresh_token(token: str) -> tuple[int, str]:
+    payload = jwt.decode(token, get_settings().jwt_secret, algorithms=["HS256"])
+    if payload.get("type") != "refresh":
+        raise jwt.InvalidTokenError("Not a refresh token")
+    return int(payload["sub"]), payload["jti"]
+
+
+def get_cookie_settings() -> dict:
+    settings = get_settings()
+    is_https = "https" in settings.frontend_url
+    return {
+        "key": COOKIE_NAME,
+        "httponly": True,
+        "secure": is_https,
+        "samesite": "lax",
+        "path": "/",
+        "max_age": settings.access_token_minutes * 60,
+    }
+
+
+def get_refresh_cookie_settings() -> dict:
+    settings = get_settings()
+    is_https = "https" in settings.frontend_url
+    return {
+        "key": REFRESH_COOKIE_NAME,
+        "httponly": True,
+        "secure": is_https,
+        "samesite": "lax",
+        "path": "/",
+        "max_age": settings.refresh_token_days * 86400,
+    }

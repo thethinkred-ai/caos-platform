@@ -37,6 +37,14 @@
 .auth-divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:#8f9bb7;font-size:13px}
 .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:#e6eaf1}
 .auth-divider span{padding:0 4px}
+.auth-form{margin-top:20px;display:flex;flex-direction:column;gap:12px}
+.auth-form h2{font:600 20px 'Space Grotesk';margin:0 0 4px;color:#2e3856}
+.auth-form input{padding:12px 14px;border-radius:10px;border:1px solid #dadce0;font-size:15px;outline:none;transition:border-color .2s}
+.auth-form input:focus{border-color:#3049d8}
+.auth-form .primary{padding:12px 18px;border-radius:10px;background:#3049d8;color:#fff;font-weight:600;font-size:15px;border:none;cursor:pointer;transition:background .2s}
+.auth-form .primary:hover{background:#2940b8}
+.auth-form .link-button{background:none;border:none;color:#3049d8;font-size:14px;cursor:pointer;text-decoration:underline;padding:4px}
+.auth-form .error{color:#e03131;font-size:14px;margin:0;padding:8px 12px;background:#fff5f5;border-radius:8px}
 .stepik-courses-preview{margin-top:28px;padding-top:20px;border-top:1px solid #e6eaf1}
 .stepik-courses-preview h3{font:600 14px 'Space Grotesk';margin:0 0 12px;color:#8f9bb7;text-transform:uppercase;letter-spacing:.5px}
 .course-link{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:#f5f7fa;text-decoration:none;color:#2e3856;font-size:14px;font-weight:500;margin-bottom:8px;transition:background .2s}

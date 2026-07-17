@@ -16,12 +16,23 @@ CurrentUser = Annotated[User, Depends(current_user)]
 
 @router.get("/knowledge", response_model=list[KnowledgeOut])
 def list_knowledge(db: Db, user: CurrentUser, project_id: int | None = None) -> list[dict]:
+    from ..models import ProjectMember
+    user_project_ids = set(db.scalars(select(Project.id).where(Project.owner_id == user.id)))
+    user_project_ids |= set(db.scalars(
+        select(ProjectMember.project_id).where(ProjectMember.user_id == user.id)
+    ))
     query = (
         select(KnowledgeItem, Project.title.label("project_name"))
         .outerjoin(Project, Project.id == KnowledgeItem.project_id)
+        .where(
+            (KnowledgeItem.author_id == user.id)
+            | (KnowledgeItem.project_id.in_(user_project_ids))
+        )
         .order_by(KnowledgeItem.created_at.desc())
     )
     if project_id is not None:
+        if project_id not in user_project_ids:
+            raise HTTPException(status_code=403, detail="Project access denied")
         query = query.where(KnowledgeItem.project_id == project_id)
     rows = db.execute(query).all()
     result = []

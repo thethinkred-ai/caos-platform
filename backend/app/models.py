@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -15,6 +15,12 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(120))
     bio: Mapped[str] = mapped_column(Text, default="")
     stepik_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    verification_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    consent_accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ai_consent: Mapped[bool] = mapped_column(Boolean, default=False)
+    profile_visibility: Mapped[str] = mapped_column(String(20), default="private")
+    role: Mapped[str] = mapped_column(String(20), default="member")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     problems: Mapped[list["Problem"]] = relationship(back_populates="author")
@@ -22,6 +28,33 @@ class User(Base):
     teams: Mapped[list["TeamMember"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     project_memberships: Mapped[list["ProjectMember"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     decisions: Mapped[list["Decision"]] = relationship(back_populates="author")
+    auth_identities: Mapped[list["AuthIdentity"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class AuthIdentity(Base):
+    __tablename__ = "auth_identities"
+    __table_args__ = (UniqueConstraint("provider", "provider_subject", name="uq_auth_identity"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider: Mapped[str] = mapped_column(String(30))
+    provider_subject: Mapped[str] = mapped_column(String(255))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    verified_email: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="auth_identities")
+
+
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    jti: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    refresh_token_hash: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class Problem(Base):
@@ -48,6 +81,10 @@ class Goal(Base):
     problem_id: Mapped[int | None] = mapped_column(ForeignKey("problems.id"), nullable=True)
     parent_goal_id: Mapped[int | None] = mapped_column(ForeignKey("goals.id"), nullable=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    priority: Mapped[str] = mapped_column(String(20), default="medium")
+    success_criteria: Mapped[str] = mapped_column(Text, default="")
+    required_resources: Mapped[str] = mapped_column(Text, default="")
+    expected_outcome: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     problem: Mapped[Problem | None] = relationship(back_populates="goals")
@@ -65,11 +102,18 @@ class Decision(Base):
     status: Mapped[str] = mapped_column(String(30), default="proposed", index=True)
     goal_id: Mapped[int | None] = mapped_column(ForeignKey("goals.id"), nullable=True)
     author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    alternatives: Mapped[str] = mapped_column(Text, default="")
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    outcome: Mapped[str] = mapped_column(Text, default="")
+    decision_method: Mapped[str] = mapped_column(String(50), default="consensus")
+    quorum: Mapped[int] = mapped_column(default=1)
+    deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     goal: Mapped[Goal | None] = relationship(back_populates="decisions")
     author: Mapped[User] = relationship(back_populates="decisions")
     events: Mapped[list["DecisionEvent"]] = relationship(back_populates="decision", cascade="all, delete-orphan", order_by="DecisionEvent.created_at")
+    votes: Mapped[list["Vote"]] = relationship(back_populates="decision", cascade="all, delete-orphan")
 
 
 class DecisionEvent(Base):
@@ -151,6 +195,7 @@ class Task(Base):
     status: Mapped[str] = mapped_column(String(30), default="todo", index=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"))
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    competence_requirements: Mapped[str | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     project: Mapped[Project] = relationship(back_populates="tasks")
@@ -199,4 +244,31 @@ class Competence(Base):
     name: Mapped[str] = mapped_column(String(120))
     level: Mapped[int] = mapped_column(default=1)
     description: Mapped[str] = mapped_column(Text, default="")
+    is_visible: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class Vote(Base):
+    __tablename__ = "votes"
+    __table_args__ = (UniqueConstraint("decision_id", "user_id", name="uq_vote_decision_user"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    decision_id: Mapped[int] = mapped_column(ForeignKey("decisions.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    variant: Mapped[str] = mapped_column(String(30))
+    comment: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    decision: Mapped[Decision] = relationship(back_populates="votes")
+
+
+class AISuggestion(Base):
+    __tablename__ = "ai_suggestions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    endpoint: Mapped[str] = mapped_column(String(100))
+    suggestion: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    reason: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

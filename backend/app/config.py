@@ -7,7 +7,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./caos.db"
     jwt_secret: str = "local-development-secret-change-me"
     cors_origins: str = "http://localhost:5173"
-    access_token_minutes: int = 30
+    access_token_minutes: int = 15
+    refresh_token_days: int = 7
+    debug: bool = False
     ai_api_key: str = ""
     ai_base_url: str = "https://api.openai.com/v1"
     ai_model: str = "gpt-4o-mini"
@@ -19,8 +21,23 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "noreply@caos.thinkred.ru"
+    audit_retention_days: int = 90
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    def validate_production(self) -> None:
+        """Fail-fast if default secrets are used in production (non-SQLite DB)."""
+        is_prod = not self.database_url.startswith("sqlite")
+        if is_prod:
+            if self.jwt_secret == "local-development-secret-change-me":
+                raise RuntimeError("JWT_SECRET must be set to a non-default value in production")
+            if "change-me" in self.database_url:
+                raise RuntimeError("POSTGRES_PASSWORD must be set to a non-default value in production")
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -33,4 +50,6 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    s = Settings()
+    s.validate_production()
+    return s

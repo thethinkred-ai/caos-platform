@@ -33,14 +33,13 @@ const labels: Record<Section, string> = {
 };
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem("caos_token");
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...options,
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
     });
@@ -157,45 +156,56 @@ export default function AppNew() {
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tokenParam = params.get("token");
-    if (tokenParam) {
-      localStorage.setItem("caos_token", tokenParam);
-      window.history.replaceState({}, document.title, window.location.pathname);
+    const path = window.location.pathname;
+    if (path === "/auth/callback") {
+      window.history.replaceState({}, document.title, "/");
       request<User>("/auth/me")
         .then((current) => {
           setUser(current);
           return loadData();
         })
-        .catch(() => localStorage.removeItem("caos_token"));
+        .catch(() => {
+          setError("Не удалось войти через OAuth. Попробуйте ещё раз.");
+        });
       return;
     }
-    if (localStorage.getItem("caos_token"))
-      request<User>("/auth/me")
-        .then((current) => {
-          setUser(current);
-          return loadData();
-        })
-        .catch(() => localStorage.removeItem("caos_token"));
+    const params = new URLSearchParams(window.location.search);
+    const errorParam = params.get("error");
+    if (errorParam) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setError("Не удалось войти. Попробуйте другой способ.");
+      return;
+    }
+    request<User>("/auth/me")
+      .then((current) => {
+        setUser(current);
+        return loadData();
+      })
+      .catch(() => {});
   }, []);
 
   const submitAuth = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
     try {
-      const data = await request<{ access_token: string; user: User }>(`/auth/${mode}`, {
+      if (mode === "register") {
+        await request<{ message: string }>(`/auth/register`, {
+          method: "POST",
+          body: JSON.stringify({ email, password, display_name: displayName, consent_accepted: true }),
+        });
+        setMode("login");
+        setError("Аккаунт создан. Проверьте email для подтверждения, затем войдите.");
+        return;
+      }
+      const data = await request<{ user: User }>(`/auth/login`, {
         method: "POST",
-        body: JSON.stringify(mode === "register" ? { email, password, display_name: displayName } : { email, password }),
+        body: JSON.stringify({ email, password }),
       });
-      localStorage.setItem("caos_token", data.access_token);
       setUser(data.user);
       await loadData();
     } catch (e) {
       const message = e instanceof Error ? e.message : "Ошибка авторизации";
-      if (message === "Email already registered") {
-        setMode("login");
-        setError("Этот email уже зарегистрирован. Введите пароль и войдите.");
-      } else setError(message);
+      setError(message);
     }
   };
 
@@ -474,10 +484,49 @@ export default function AppNew() {
               <span className="google-icon">G</span>
               Войти через Google
             </a>
-            {error && error.includes("auth_failed") && (
-              <p className="error">Не удалось войти. Попробуйте ещё раз.</p>
-            )}
           </div>
+          <div className="auth-divider"><span>или</span></div>
+          <form onSubmit={submitAuth} className="auth-form">
+            <h2>{mode === "register" ? "Создать аккаунт" : "Войти"}</h2>
+            {mode === "register" && (
+              <input
+                placeholder="Ваше имя"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                required
+                minLength={2}
+              />
+            )}
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <input
+              type="password"
+              placeholder="Пароль (минимум 12 символов)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={12}
+            />
+            {error && <p className="error">{error}</p>}
+            <button type="submit" className="primary">
+              {mode === "register" ? "Начать работу" : "Войти"}
+            </button>
+            <button
+              type="button"
+              className="link-button"
+              onClick={() => {
+                setMode(mode === "register" ? "login" : "register");
+                setError("");
+              }}
+            >
+              {mode === "register" ? "Уже есть аккаунт? Войти" : "Нет аккаунта? Зарегистрироваться"}
+            </button>
+          </form>
           <div className="stepik-courses-preview">
             <h3>Наши курсы на Stepik:</h3>
             <a className="course-link" href="https://stepik.org/course/288738" target="_blank" rel="noopener">
@@ -530,7 +579,7 @@ export default function AppNew() {
         <button
           className="logout"
           onClick={() => {
-            localStorage.removeItem("caos_token");
+            request("/auth/logout", { method: "POST" }).catch(() => {});
             setUser(null);
           }}
         >

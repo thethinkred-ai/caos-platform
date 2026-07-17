@@ -8,8 +8,8 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
 from ..llm import is_llm_available, llm_complete_sync
-from ..models import AuditEvent, Competence, Decision, DecisionEvent, Goal, KnowledgeItem, Problem, Project, User
-from ..schemas import AIRecommendation
+from ..models import AISuggestion, AuditEvent, Competence, Decision, DecisionEvent, Goal, KnowledgeItem, Problem, Project, ProjectMember, Task, User
+from ..schemas import AIRecommendation, AISuggestionOut, AISuggestionResolve
 
 router = APIRouter()
 Db = Annotated[Session, Depends(get_db)]
@@ -90,9 +90,11 @@ def _llm_similar_problems(db: Session, problem_id: int) -> AIRecommendation:
 
 
 def _llm_similar_people(db: Session, user: User) -> AIRecommendation:
+    if not user.ai_consent:
+        return AIRecommendation(suggestion="AI-анализ требует согласия на обработку данных. Включите AI-согласие в настройках профиля.", source="consent_required", confidence=0.0)
     answer = llm_complete_sync(
         SYSTEM_PROMPT,
-        f"Пользователь: {user.display_name}. Подскажи, как найти единомышленников для совместной деятельности над проблемами и целями.",
+        f"Пользователь интересуется коллективной деятельностью. Подскажи, как найти единомышленников для совместной работы над проблемами и целями.",
     )
     if not answer:
         return _stub_similar_people(db, user)
@@ -271,3 +273,141 @@ def ai_status(user: CurrentUser) -> dict:
         "model": settings.ai_model if is_llm_available() else None,
         "base_url": settings.ai_base_url if is_llm_available() else None,
     }
+
+
+@router.get("/tasks/{task_id}/match-people")
+def match_people_to_task(task_id: int, db: Db, user: CurrentUser) -> list[dict]:
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    project = task.project
+    if project.owner_id != user.id and not db.scalar(
+        select(ProjectMember).where(ProjectMember.project_id == project.id, ProjectMember.user_id == user.id)
+    ):
+        raise HTTPException(status_code=403, detail="Project membership required")
+    requirements = task.competence_requirements or []
+    if not requirements:
+        return []
+    member_ids = set(db.scalars(
+        select(ProjectMember.user_id).where(ProjectMember.project_id == project.id)
+    )) | {project.owner_id}
+    matches = []
+    for uid in member_ids:
+        comps = list(db.scalars(select(Competence).where(Competence.user_id == uid, Competence.is_visible == True)))
+        matched = [c for c in comps if any(req.lower() in c.name.lower() for req in requirements)]
+        if matched:
+            u = db.get(User, uid)
+            matches.append({
+                "user_id": uid,
+                "display_name": u.display_name if u else f"User #{uid}",
+                "matched_competences": [{"name": c.name, "level": c.level} for c in matched],
+                "score": sum(c.level for c in matched),
+            })
+    matches.sort(key=lambda m: m["score"], reverse=True)
+    return matches[:10]
+
+
+@router.get("/ai/suggestions", response_model=list[AISuggestionOut])
+def list_ai_suggestions(db: Db, user: CurrentUser) -> list[AISuggestion]:
+    return list(db.scalars(
+        select(AISuggestion)
+        .where(AISuggestion.user_id == user.id)
+        .order_by(AISuggestion.created_at.desc())
+        .limit(20)
+    ))
+
+
+@router.post("/ai/suggestions/{suggestion_id}/resolve", response_model=AISuggestionOut)
+def resolve_ai_suggestion(suggestion_id: int, payload: AISuggestionResolve, db: Db, user: CurrentUser) -> AISuggestion:
+    item = db.get(AISuggestion, suggestion_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    if item.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    item.status = payload.status
+    item.reason = payload.reason
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.get("/recommendations/scenario/{goal_id}", response_model=AIRecommendation)
+def scenario_analysis(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
+    goal = db.get(Goal, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    if is_llm_available():
+        answer = llm_complete_sync(
+            SYSTEM_PROMPT,
+            f"Цель: {goal.title}. Описание: {goal.description}. "
+            f"Предложи 3 сценария развития (оптимистичный, реалистичный, пессимистичный) с оценкой рисков.",
+        )
+        if answer:
+            return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
+    return AIRecommendation(suggestion="AI-моделирование сценариев будет подключено после настройки LLM.", source="stub", confidence=0.0)
+
+
+@router.get("/recommendations/risk-analysis/{goal_id}", response_model=AIRecommendation)
+def risk_analysis(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
+    goal = db.get(Goal, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    if is_llm_available():
+        answer = llm_complete_sync(
+            SYSTEM_PROMPT,
+            f"Цель: {goal.title}. Ресурсы: {goal.required_resources}. "
+            f"Проведи анализ рисков: главные угрозы, вероятность, влияние, стратегии снижения.",
+        )
+        if answer:
+            return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
+    return AIRecommendation(suggestion="AI-анализ рисков будет подключён после настройки LLM.", source="stub", confidence=0.0)
+
+
+@router.get("/recommendations/goal-conflicts/{goal_id}", response_model=AIRecommendation)
+def goal_conflicts(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
+    goal = db.get(Goal, goal_id)
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    user_goals = list(db.scalars(select(Goal).where(Goal.owner_id == user.id, Goal.id != goal_id).limit(10)))
+    if is_llm_available() and user_goals:
+        context = "\n".join(f"- {g.title}: {g.description[:100]}" for g in user_goals)
+        answer = llm_complete_sync(
+            SYSTEM_PROMPT,
+            f"Текущая цель: {goal.title}. Другие цели пользователя:\n{context}\n"
+            f"Найди потенциальные конфликты между целями (ресурсы, время, приоритеты).",
+        )
+        if answer:
+            return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
+    return AIRecommendation(suggestion="AI-анализ конфликтов целей будет подключён после настройки LLM.", source="stub", confidence=0.0)
+
+
+@router.get("/recommendations/mentoring", response_model=AIRecommendation)
+def mentoring(db: Db, user: CurrentUser) -> AIRecommendation:
+    if not user.ai_consent:
+        return AIRecommendation(suggestion="AI-анализ требует согласия на обработку данных.", source="consent_required", confidence=0.0)
+    comps = list(db.scalars(select(Competence).where(Competence.user_id == user.id, Competence.is_visible == True)))
+    if is_llm_available() and comps:
+        context = "\n".join(f"- {c.name} (уровень {c.level})" for c in comps)
+        answer = llm_complete_sync(
+            SYSTEM_PROMPT,
+            f"Компетенции пользователя:\n{context}\n"
+            f"Предложи направления для обучения и наставничества на основе текущего профиля.",
+        )
+        if answer:
+            return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
+    return AIRecommendation(suggestion="AI-рекомендации по обучению будут подключены после настройки LLM.", source="stub", confidence=0.0)
+
+
+@router.get("/recommendations/patterns", response_model=AIRecommendation)
+def extract_patterns(db: Db, user: CurrentUser) -> AIRecommendation:
+    decisions = list(db.scalars(select(Decision).where(Decision.author_id == user.id).limit(20)))
+    if is_llm_available() and decisions:
+        context = "\n".join(f"- {d.title}: {d.proposal[:100]} ({d.status})" for d in decisions)
+        answer = llm_complete_sync(
+            SYSTEM_PROMPT,
+            f"История решений пользователя:\n{context}\n"
+            f"Извлеки закономерности в принятии решений: типичные подходы, предпочтения, слепые зоны.",
+        )
+        if answer:
+            return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
+    return AIRecommendation(suggestion="AI-извлечение закономерностей будет подключено после настройки LLM.", source="stub", confidence=0.0)
