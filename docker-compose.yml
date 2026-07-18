@@ -21,8 +21,6 @@ services:
 
   backend:
     build: ./backend
-    dns: ["127.0.0.11"]
-    dns_search: [""]
     env_file: [.env]
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-caos}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:-caos}
