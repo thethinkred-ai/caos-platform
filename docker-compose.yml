@@ -23,6 +23,7 @@ services:
     build: ./backend
     dns: ["127.0.0.11"]
     dns_search: [""]
+    env_file: [.env]
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-caos}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:-caos}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
@@ -35,6 +36,11 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/v1/auth/google/callback}
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@caos.thinkred.ru}
     depends_on:
       db:
         condition: service_healthy
