@@ -169,6 +169,24 @@ export default function AppNew() {
         });
       return;
     }
+    if (path === "/auth/verify") {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("token");
+      if (token) {
+        request<{ message: string }>(`/auth/verify?token=${encodeURIComponent(token)}`)
+          .then(() => {
+            window.history.replaceState({}, document.title, "/");
+            setError("Email подтверждён. Теперь вы можете войти.");
+          })
+          .catch(() => {
+            window.history.replaceState({}, document.title, "/");
+            setError("Ссылка подтверждения недействительна или истекла.");
+          });
+      } else {
+        window.history.replaceState({}, document.title, "/");
+      }
+      return;
+    }
     const params = new URLSearchParams(window.location.search);
     const errorParam = params.get("error");
     if (errorParam) {
@@ -194,7 +212,7 @@ export default function AppNew() {
           body: JSON.stringify({ email, password, display_name: displayName, consent_accepted: true }),
         });
         setMode("login");
-        setError("Аккаунт создан. Теперь вы можете войти.");
+        setError("Аккаунт создан. Проверьте email для подтверждения, затем войдите.");
         return;
       }
       const data = await request<{ user: User }>(`/auth/login`, {

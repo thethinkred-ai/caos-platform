@@ -18,6 +18,7 @@ from ..schemas import (
     ChangePasswordRequest, ProfileUpdate, RefreshOut, ResetPasswordConfirm,
     ResetPasswordRequest, TokenOut, UserCreate, UserLogin, UserOut,
 )
+from ..email import send_email
 from ..security import (
     COOKIE_NAME, REFRESH_COOKIE_NAME, create_access_token, create_refresh_token,
     decode_refresh_token, get_cookie_settings, get_refresh_cookie_settings,
@@ -64,15 +65,24 @@ def register(payload: UserCreate, request: Request, db: Db) -> JSONResponse:
         email=email,
         password_hash=hash_password(payload.password),
         display_name=payload.display_name,
-        is_verified=True,
+        is_verified=False,
         verification_token=_secrets.token_urlsafe(32),
         consent_accepted_at=datetime.now(UTC),
     )
     db.add(user)
     db.commit()
+    settings = get_settings()
+    verify_url = f"{settings.frontend_url}/auth/verify?token={user.verification_token}"
+    send_email(
+        email,
+        "Подтверждение регистрации — CAOS",
+        f"<p>Здравствуйте, {payload.display_name}!</p>"
+        f"<p>Для подтверждения регистрации перейдите по ссылке:</p>"
+        f"<p><a href=\"{verify_url}\">{verify_url}</a></p>",
+    )
     return JSONResponse(
         status_code=201,
-        content={"message": "Account created. You can now log in."},
+        content={"message": "Account created. Check your email for a verification link."},
     )
 
 
@@ -82,9 +92,8 @@ def login(payload: UserLogin, request: Request, db: Db) -> JSONResponse:
     user = db.scalar(select(User).where(User.email == payload.email.lower()))
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    # Email verification temporarily disabled (no SMTP configured)
-    # if not user.is_verified:
-    #     raise HTTPException(status_code=403, detail="Email not verified. Check your email.")
+    if not user.is_verified:
+        raise HTTPException(status_code=403, detail="Email not verified. Check your email.")
     response = JSONResponse(content={"user": UserOut.model_validate(user).model_dump()})
     _set_auth_cookies(response, user.id, db)
     db.add(AuditEvent(actor_id=user.id, entity_type="user", entity_id=user.id, action="login", detail=""))
@@ -167,6 +176,15 @@ def reset_password(payload: ResetPasswordRequest, db: Db) -> JSONResponse:
     if user:
         user.verification_token = _secrets.token_urlsafe(32)
         db.commit()
+        settings = get_settings()
+        reset_url = f"{settings.frontend_url}/auth/reset-password?token={user.verification_token}"
+        send_email(
+            payload.email.lower(),
+            "Сброс пароля — CAOS",
+            f"<p>Для сброса пароля перейдите по ссылке:</p>"
+            f"<p><a href=\"{reset_url}\">{reset_url}</a></p>"
+            f"<p>Если вы не запрашивали сброс пароля, проигнорируйте это письмо.</p>",
+        )
     return JSONResponse(content={"message": "If this email is registered, a reset link has been sent."})
 
 

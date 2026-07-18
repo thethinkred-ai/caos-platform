@@ -57,7 +57,7 @@ export default function App() {
           body: JSON.stringify({ email, password, display_name: displayName, consent_accepted: true }),
         });
         setMode("login");
-        setError("Аккаунт создан. Теперь вы можете войти.");
+        setError("Аккаунт создан. Проверьте email для подтверждения, затем войдите.");
         return;
       }
       const data = await request<{ user: User }>(`/auth/login`, {
