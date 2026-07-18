@@ -64,7 +64,7 @@ def register(payload: UserCreate, request: Request, db: Db) -> JSONResponse:
         email=email,
         password_hash=hash_password(payload.password),
         display_name=payload.display_name,
-        is_verified=False,
+        is_verified=True,
         verification_token=_secrets.token_urlsafe(32),
         consent_accepted_at=datetime.now(UTC),
     )
@@ -72,7 +72,7 @@ def register(payload: UserCreate, request: Request, db: Db) -> JSONResponse:
     db.commit()
     return JSONResponse(
         status_code=201,
-        content={"message": "Account created. Check your email for a verification link."},
+        content={"message": "Account created. You can now log in."},
     )
 
 
@@ -82,8 +82,9 @@ def login(payload: UserLogin, request: Request, db: Db) -> JSONResponse:
     user = db.scalar(select(User).where(User.email == payload.email.lower()))
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    if not user.is_verified:
-        raise HTTPException(status_code=403, detail="Email not verified. Check your email.")
+    # Email verification temporarily disabled (no SMTP configured)
+    # if not user.is_verified:
+    #     raise HTTPException(status_code=403, detail="Email not verified. Check your email.")
     response = JSONResponse(content={"user": UserOut.model_validate(user).model_dump()})
     _set_auth_cookies(response, user.id, db)
     db.add(AuditEvent(actor_id=user.id, entity_type="user", entity_id=user.id, action="login", detail=""))
