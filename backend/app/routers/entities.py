@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..access import require_goal, user_goal_ids, user_project_ids
 from ..db import get_db
 from ..deps import current_user
-from ..models import AuditEvent, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, Project, ProjectMember, Task, Team, TeamMember, User, Vote
+from ..models import AuditEvent, Commitment, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, Project, ProjectMember, Task, Team, TeamMember, User, Vote
 from ..schemas import AuditEventOut, DecisionCreate, DecisionEventCreate, DecisionEventOut, DecisionOut, GoalCreate, GoalOut, MemberCreate, MemberOut, ProblemCreate, ProblemOut, ProjectCreate, ProjectMemberOut, ProjectOut, ProjectStatusUpdate, TaskAssign, TaskCreate, TaskOut, TeamCreate, TeamOut, VoteCreate, VoteOut, VoteSummary
 
 router = APIRouter()
@@ -275,6 +275,12 @@ def create_task(project_id: int, payload: TaskCreate, db: Db, user: CurrentUser)
         raise HTTPException(status_code=404, detail="Project not found")
     if project.owner_id != user.id and not db.scalar(select(ProjectMember).where(ProjectMember.project_id == project_id, ProjectMember.user_id == user.id)):
         raise HTTPException(status_code=403, detail="Project membership required")
+    if payload.commitment_id is not None:
+        commitment = db.get(Commitment, payload.commitment_id)
+        if not commitment:
+            raise HTTPException(status_code=404, detail="Commitment not found")
+        if commitment.goal_id not in user_goal_ids(db, user.id):
+            raise HTTPException(status_code=403, detail="Commitment access denied")
     item = Task(**payload.model_dump(), project_id=project_id)
     db.add(item)
     db.commit()

@@ -178,6 +178,7 @@ class TaskCreate(BaseModel):
     title: str = Field(min_length=3, max_length=200)
     description: str = ""
     assignee_id: int | None = None
+    commitment_id: int | None = None
     competence_requirements: list[str] | None = None
 
 
@@ -246,6 +247,25 @@ class AuditEventOut(BaseModel):
     action: str
     detail: str
     created_at: datetime
+
+
+class GoalParticipationCreate(BaseModel):
+    user_id: int | None = None
+    role: str = Field(default="contributor", pattern="^(contributor|coordinator|expert|facilitator|observer)$")
+
+
+class GoalParticipationRoleUpdate(BaseModel):
+    role: str = Field(pattern="^(contributor|coordinator|expert|facilitator|observer)$")
+
+
+class CommitmentCreate(BaseModel):
+    description: str = Field(min_length=3, max_length=2000)
+    expected_result: str = Field(default="", max_length=2000)
+    deadline: datetime | None = None
+
+
+class CommitmentStatusUpdate(BaseModel):
+    status: str = Field(pattern="^(in_progress|fulfilled|failed|withdrawn)$")
 
 
 class SearchResults(BaseModel):

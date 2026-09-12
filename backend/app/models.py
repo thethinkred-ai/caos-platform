@@ -112,6 +112,49 @@ class GoalRelation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+GOAL_PARTICIPATION_ROLES = ("contributor", "coordinator", "expert", "facilitator", "observer")
+
+
+class GoalParticipation(Base):
+    """A person's contextual relation to a specific goal (ADR-0004).
+
+    Roles are contextual: the same user can be an expert in one goal and
+    an observer in another. Replaces project/team membership as the
+    primary form of association with activity.
+    """
+
+    __tablename__ = "goal_participations"
+    __table_args__ = (UniqueConstraint("goal_id", "user_id", name="uq_goal_participation"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    goal_id: Mapped[int] = mapped_column(ForeignKey("goals.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    role: Mapped[str] = mapped_column(String(30), default="contributor")
+    status: Mapped[str] = mapped_column(String(20), default="active")
+    joined_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    left_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class Commitment(Base):
+    """A voluntarily accepted obligation of concrete work towards a goal.
+
+    Not an assignment: `source` records the basis (own initiative, a
+    collective decision, or delegation).
+    """
+
+    __tablename__ = "commitments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    goal_id: Mapped[int] = mapped_column(ForeignKey("goals.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    description: Mapped[str] = mapped_column(Text)
+    expected_result: Mapped[str] = mapped_column(Text, default="")
+    deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    source: Mapped[str] = mapped_column(String(20), default="self")
+    status: Mapped[str] = mapped_column(String(20), default="open", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Decision(Base):
     __tablename__ = "decisions"
 
@@ -214,7 +257,8 @@ class Task(Base):
     status: Mapped[str] = mapped_column(String(30), default="todo", index=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"))
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    competence_requirements: Mapped[str | None] = mapped_column(JSON, nullable=True)
+    commitment_id: Mapped[int | None] = mapped_column(ForeignKey("commitments.id"), nullable=True, index=True)
+    competence_requirements: Mapped[JSON | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     project: Mapped[Project] = relationship(back_populates="tasks")

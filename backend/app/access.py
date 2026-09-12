@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Goal, Project, ProjectMember
+from .models import Goal, GoalParticipation, Project, ProjectMember
 
 
 def user_project_ids(db: Session, user_id: int) -> set[int]:
@@ -21,7 +21,8 @@ def user_project_ids(db: Session, user_id: int) -> set[int]:
 
 
 def user_goal_ids(db: Session, user_id: int) -> set[int]:
-    """Goals the user owns or that are linked to the user's projects."""
+    """Goals the user owns, is a participant of, or that are linked to
+    the user's projects."""
     owned = set(db.scalars(select(Goal.id).where(Goal.owner_id == user_id)))
     project_goal_ids = set(db.scalars(
         select(Project.goal_id).where(Project.owner_id == user_id, Project.goal_id.isnot(None))
@@ -31,7 +32,13 @@ def user_goal_ids(db: Session, user_id: int) -> set[int]:
         .join(ProjectMember, ProjectMember.project_id == Project.id)
         .where(ProjectMember.user_id == user_id, Project.goal_id.isnot(None))
     ))
-    return owned | project_goal_ids | member_goal_ids
+    participated_goal_ids = set(db.scalars(
+        select(GoalParticipation.goal_id).where(
+            GoalParticipation.user_id == user_id,
+            GoalParticipation.status == "active",
+        )
+    ))
+    return owned | project_goal_ids | member_goal_ids | participated_goal_ids
 
 
 def require_goal(db: Session, user_id: int, goal_id: int) -> Goal:

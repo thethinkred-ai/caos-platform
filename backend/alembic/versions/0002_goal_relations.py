@@ -17,6 +17,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # 0001 converges dynamically to the CURRENT models, so on a fresh
+    # database goal_relations may already exist by the time we get here.
+    inspector = sa.inspect(op.get_bind())
+    if inspector.has_table("goal_relations"):
+        return
     op.create_table(
         "goal_relations",
         sa.Column("id", sa.Integer(), primary_key=True),
