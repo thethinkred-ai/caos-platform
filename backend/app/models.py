@@ -326,6 +326,22 @@ class Project(Base):
     members: Mapped[list["ProjectMember"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
 
+class ProjectGoal(Base):
+    """Many-to-many project <-> goal (Track C7): one project can serve
+    several goals and one goal can be served by several projects. The
+    singular projects.goal_id remains as the legacy primary link."""
+
+    __tablename__ = "project_goals"
+    __table_args__ = (UniqueConstraint("project_id", "goal_id", name="uq_project_goal"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), index=True)
+    goal_id: Mapped[int] = mapped_column(ForeignKey("goals.id"), index=True)
+    relation_type: Mapped[str] = mapped_column(String(30), default="serves")
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Team(Base):
     __tablename__ = "teams"
 
@@ -394,6 +410,23 @@ class KnowledgeItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class KnowledgeRelation(Base):
+    """A knowledge item linked into the goal graph (Track C7): knowledge
+    supports a goal, explains a decision, evidences a result or relates
+    to a problem — instead of living only inside one project."""
+
+    __tablename__ = "knowledge_relations"
+    __table_args__ = (UniqueConstraint("knowledge_id", "target_type", "target_id", name="uq_knowledge_relation"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    knowledge_id: Mapped[int] = mapped_column(ForeignKey("knowledge_items.id"), index=True)
+    target_type: Mapped[str] = mapped_column(String(20), index=True)  # problem / goal / decision / result
+    target_id: Mapped[int] = mapped_column(index=True)
+    relation_type: Mapped[str] = mapped_column(String(30), default="supports")
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class AuditEvent(Base):
     __tablename__ = "audit_events"
 
@@ -445,6 +478,10 @@ class Vote(Base):
 
 
 class AISuggestion(Base):
+    """An AI proposal (G1): every AI output is recorded with its model,
+    input snapshot and confidence, and can only affect the domain after
+    a human reviews it (ADR-0003)."""
+
     __tablename__ = "ai_suggestions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -453,4 +490,12 @@ class AISuggestion(Base):
     suggestion: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="pending")
     reason: Mapped[str] = mapped_column(Text, default="")
+    model_name: Mapped[str] = mapped_column(String(100), default="")
+    input_snapshot: Mapped[str] = mapped_column(Text, default="")
+    confidence: Mapped[float | None] = mapped_column(nullable=True)
+    proposal_type: Mapped[str] = mapped_column(String(30), default="recommendation")
+    target_type: Mapped[str] = mapped_column(String(20), default="")
+    target_id: Mapped[int | None] = mapped_column(nullable=True)
+    reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

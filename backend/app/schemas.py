@@ -374,6 +374,33 @@ class ChallengeResolve(BaseModel):
     resolution: str = Field(min_length=3, max_length=5000)
 
 
+class ProjectGoalCreate(BaseModel):
+    goal_id: int
+    relation_type: str = Field(default="serves", pattern="^(serves|supports|contributes_to)$")
+
+
+class ProjectGoalOut(ProjectGoalCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    project_id: int
+    created_by: int
+    created_at: datetime
+
+
+class KnowledgeRelationCreate(BaseModel):
+    target_type: str = Field(pattern="^(problem|goal|decision|result)$")
+    target_id: int
+    relation_type: str = Field(default="supports", pattern="^(supports|explains|evidences|relates|contradicts)$")
+
+
+class KnowledgeRelationOut(KnowledgeRelationCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    knowledge_id: int
+    created_by: int
+    created_at: datetime
+
+
 class SearchResults(BaseModel):
     problems: list[ProblemOut] = []
     goals: list[GoalOut] = []
@@ -468,6 +495,14 @@ class AISuggestionOut(BaseModel):
     suggestion: str
     status: str
     reason: str
+    model_name: str = ""
+    input_snapshot: str = ""
+    confidence: float | None = None
+    proposal_type: str = "recommendation"
+    target_type: str = ""
+    target_id: int | None = None
+    reviewed_by: int | None = None
+    reviewed_at: datetime | None = None
     created_at: datetime
 
 

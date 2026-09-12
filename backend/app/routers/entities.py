@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..access import require_goal, user_goal_ids, user_project_ids
 from ..db import get_db
 from ..deps import current_user
-from ..models import AuditEvent, Commitment, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, Project, ProjectMember, ProposalVersion, Task, Team, TeamMember, User, Vote
+from ..models import AuditEvent, Commitment, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, Project, ProjectGoal, ProjectMember, ProposalVersion, Task, Team, TeamMember, User, Vote
 from ..schemas import AuditEventOut, DecisionCreate, DecisionEventCreate, DecisionEventOut, DecisionOut, GoalCreate, GoalOut, MemberCreate, MemberOut, ProblemCreate, ProblemOut, ProjectCreate, ProjectMemberOut, ProjectOut, ProjectStatusUpdate, TaskAssign, TaskCreate, TaskOut, TeamCreate, TeamOut, VoteCreate, VoteOut, VoteSummary
 
 router = APIRouter()
@@ -162,6 +162,9 @@ def create_project(payload: ProjectCreate, db: Db, user: CurrentUser) -> Project
     item = Project(**payload.model_dump(), owner_id=user.id)
     db.add(item)
     db.flush()
+    if payload.goal_id:
+        # Keep the M2M table the single listing source; goal_id stays the legacy primary link.
+        db.add(ProjectGoal(project_id=item.id, goal_id=payload.goal_id, relation_type="serves", created_by=user.id))
     db.add(AuditEvent(actor_id=user.id, entity_type="project", entity_id=item.id, action="created", detail=item.title))
     db.commit()
     db.refresh(item)

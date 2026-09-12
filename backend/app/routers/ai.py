@@ -17,6 +17,28 @@ Db = Annotated[Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(current_user)]
 settings = get_settings()
 
+
+def _record_proposal(
+    db: Session, user: User, endpoint: str, recommendation, target_type: str = "", target_id: int | None = None
+):
+    """Persist every AI output as a reviewable proposal (ADR-0003): the
+    only channel through which AI can influence the domain."""
+    snapshot = recommendation.suggestion[:2000]
+    proposal = AISuggestion(
+        user_id=user.id,
+        endpoint=endpoint,
+        suggestion=recommendation.suggestion,
+        status="pending",
+        model_name=recommendation.source,
+        input_snapshot=snapshot,
+        confidence=recommendation.confidence,
+        proposal_type="recommendation",
+        target_type=target_type,
+        target_id=target_id,
+    )
+    db.add(proposal)
+    db.commit()
+
 SYSTEM_PROMPT = (
     "You are an AI assistant for a collaborative action platform (CAOS). "
     "Users formulate problems, set goals, run projects, and build a knowledge base. "
@@ -147,29 +169,41 @@ def _llm_decompose_goal(db: Session, user: User, goal_id: int) -> AIRecommendati
 @router.get("/recommendations/similar-problems/{problem_id}", response_model=AIRecommendation)
 def similar_problems(problem_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
     if is_llm_available():
-        return _llm_similar_problems(db, user, problem_id)
-    return _stub_similar_problems(db, user, problem_id)
+        result = _llm_similar_problems(db, user, problem_id)
+    else:
+        result = _stub_similar_problems(db, user, problem_id)
+    _record_proposal(db, user, "similar_problems", result, "problem", problem_id)
+    return result
 
 
 @router.get("/recommendations/people", response_model=AIRecommendation)
 def similar_people(db: Db, user: CurrentUser) -> AIRecommendation:
     if is_llm_available():
-        return _llm_similar_people(db, user)
-    return _stub_similar_people(db, user)
+        result = _llm_similar_people(db, user)
+    else:
+        result = _stub_similar_people(db, user)
+    _record_proposal(db, user, "similar_people", result)
+    return result
 
 
 @router.get("/recommendations/knowledge", response_model=AIRecommendation)
 def find_knowledge(db: Db, user: CurrentUser, q: str = Query(min_length=2, max_length=200)) -> AIRecommendation:
     if is_llm_available():
-        return _llm_find_knowledge(db, user, q)
-    return _stub_find_knowledge(db, user, q)
+        result = _llm_find_knowledge(db, user, q)
+    else:
+        result = _stub_find_knowledge(db, user, q)
+    _record_proposal(db, user, "find_knowledge", result)
+    return result
 
 
 @router.get("/recommendations/decompose/{goal_id}", response_model=AIRecommendation)
 def decompose_goal(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
     if is_llm_available():
-        return _llm_decompose_goal(db, user, goal_id)
-    return _stub_decompose_goal(db, user, goal_id)
+        result = _llm_decompose_goal(db, user, goal_id)
+    else:
+        result = _stub_decompose_goal(db, user, goal_id)
+    _record_proposal(db, user, "decompose_goal", result, "goal", goal_id)
+    return result
 
 
 def _llm_similar_goals(db: Session, user: User, goal_id: int) -> AIRecommendation:
@@ -351,6 +385,10 @@ def resolve_ai_suggestion(suggestion_id: int, payload: AISuggestionResolve, db: 
         raise HTTPException(status_code=403, detail="Access denied")
     item.status = payload.status
     item.reason = payload.reason
+    item.reviewed_by = user.id
+    from datetime import UTC, datetime
+
+    item.reviewed_at = datetime.now(UTC)
     db.commit()
     db.refresh(item)
     return item
