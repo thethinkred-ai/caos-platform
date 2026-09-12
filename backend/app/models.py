@@ -105,7 +105,7 @@ class Decision(Base):
     alternatives: Mapped[str] = mapped_column(Text, default="")
     rationale: Mapped[str] = mapped_column(Text, default="")
     outcome: Mapped[str] = mapped_column(Text, default="")
-    decision_method: Mapped[str] = mapped_column(String(50), default="consensus")
+    decision_method: Mapped[str] = mapped_column(String(50), default="majority")
     quorum: Mapped[int] = mapped_column(default=1)
     deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

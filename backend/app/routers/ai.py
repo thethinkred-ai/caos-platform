@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..access import require_goal, user_goal_ids, user_project_ids
 from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
@@ -23,12 +24,19 @@ SYSTEM_PROMPT = (
 )
 
 
-def _stub_similar_problems(db: Session, problem_id: int) -> AIRecommendation:
+def _require_own_problem(db: Session, user: User, problem_id: int) -> Problem:
     problem = db.get(Problem, problem_id)
     if not problem:
         raise HTTPException(status_code=404, detail="Problem not found")
+    if problem.author_id != user.id:
+        raise HTTPException(status_code=403, detail="Problem access denied")
+    return problem
+
+
+def _stub_similar_problems(db: Session, user: User, problem_id: int) -> AIRecommendation:
+    _require_own_problem(db, user, problem_id)
     others = list(db.scalars(
-        select(Problem).where(Problem.id != problem_id).limit(5)
+        select(Problem).where(Problem.author_id == user.id, Problem.id != problem_id).limit(5)
     ))
     titles = [p.title for p in others] or ["Похожих проблем не найдено"]
     return AIRecommendation(
@@ -46,8 +54,18 @@ def _stub_similar_people(db: Session, user: User) -> AIRecommendation:
     )
 
 
-def _stub_find_knowledge(db: Session, query: str) -> AIRecommendation:
-    items = list(db.scalars(select(KnowledgeItem).limit(5)))
+def _visible_knowledge(db: Session, user: User, limit: int) -> list[KnowledgeItem]:
+    from sqlalchemy import or_
+
+    pids = user_project_ids(db, user.id)
+    cond = KnowledgeItem.author_id == user.id
+    if pids:
+        cond = or_(cond, KnowledgeItem.project_id.in_(pids))
+    return list(db.scalars(select(KnowledgeItem).where(cond).limit(limit)))
+
+
+def _stub_find_knowledge(db: Session, user: User, query: str) -> AIRecommendation:
+    items = _visible_knowledge(db, user, 5)
     if items:
         titles = [k.title for k in items]
         return AIRecommendation(
@@ -62,10 +80,8 @@ def _stub_find_knowledge(db: Session, query: str) -> AIRecommendation:
     )
 
 
-def _stub_decompose_goal(db: Session, goal_id: int) -> AIRecommendation:
-    goal = db.get(Goal, goal_id)
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+def _stub_decompose_goal(db: Session, user: User, goal_id: int) -> AIRecommendation:
+    goal = require_goal(db, user.id, goal_id)
     return AIRecommendation(
         suggestion=f"Предлагается разбить цель «{goal.title}» на: 1) исследование, 2) планирование, 3) реализация, 4) оценка.",
         source="heuristic",
@@ -73,11 +89,11 @@ def _stub_decompose_goal(db: Session, goal_id: int) -> AIRecommendation:
     )
 
 
-def _llm_similar_problems(db: Session, problem_id: int) -> AIRecommendation:
-    problem = db.get(Problem, problem_id)
-    if not problem:
-        raise HTTPException(status_code=404, detail="Problem not found")
-    others = list(db.scalars(select(Problem).where(Problem.id != problem_id).limit(10)))
+def _llm_similar_problems(db: Session, user: User, problem_id: int) -> AIRecommendation:
+    _require_own_problem(db, user, problem_id)
+    others = list(db.scalars(
+        select(Problem).where(Problem.author_id == user.id, Problem.id != problem_id).limit(10)
+    ))
     context = f"Проблема: {problem.title}\nОписание: {problem.description}\n\nДругие проблемы:\n"
     context += "\n".join(f"- {p.title}: {p.description[:80]}" for p in others) or "Нет других проблем."
     answer = llm_complete_sync(
@@ -85,7 +101,7 @@ def _llm_similar_problems(db: Session, problem_id: int) -> AIRecommendation:
         f"Найди 3 наиболее релевантные проблемы из списка ниже и объясни почему.\n{context}",
     )
     if not answer:
-        return _stub_similar_problems(db, problem_id)
+        return _stub_similar_problems(db, user, problem_id)
     return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
 
 
@@ -101,22 +117,20 @@ def _llm_similar_people(db: Session, user: User) -> AIRecommendation:
     return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
 
 
-def _llm_find_knowledge(db: Session, query: str) -> AIRecommendation:
-    items = list(db.scalars(select(KnowledgeItem).limit(10)))
+def _llm_find_knowledge(db: Session, user: User, query: str) -> AIRecommendation:
+    items = _visible_knowledge(db, user, 10)
     context = "\n".join(f"- {k.title}: {k.content[:100]}" for k in items) or "База знаний пуста."
     answer = llm_complete_sync(
         SYSTEM_PROMPT,
         f"Найди релевантные знания по запросу «{query}».\nДоступные элементы:\n{context}",
     )
     if not answer:
-        return _stub_find_knowledge(db, query)
+        return _stub_find_knowledge(db, user, query)
     return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
 
 
-def _llm_decompose_goal(db: Session, goal_id: int) -> AIRecommendation:
-    goal = db.get(Goal, goal_id)
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+def _llm_decompose_goal(db: Session, user: User, goal_id: int) -> AIRecommendation:
+    goal = require_goal(db, user.id, goal_id)
     projects = list(db.scalars(select(Project).where(Project.goal_id == goal_id).limit(5)))
     context = f"Цель: {goal.title}\nОписание: {goal.description}\n"
     if projects:
@@ -126,15 +140,15 @@ def _llm_decompose_goal(db: Session, goal_id: int) -> AIRecommendation:
         f"Предложи декомпозицию цели на 3-5 подзадач с кратким обоснованием.\n{context}",
     )
     if not answer:
-        return _stub_decompose_goal(db, goal_id)
+        return _stub_decompose_goal(db, user, goal_id)
     return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
 
 
 @router.get("/recommendations/similar-problems/{problem_id}", response_model=AIRecommendation)
 def similar_problems(problem_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
     if is_llm_available():
-        return _llm_similar_problems(db, problem_id)
-    return _stub_similar_problems(db, problem_id)
+        return _llm_similar_problems(db, user, problem_id)
+    return _stub_similar_problems(db, user, problem_id)
 
 
 @router.get("/recommendations/people", response_model=AIRecommendation)
@@ -147,22 +161,20 @@ def similar_people(db: Db, user: CurrentUser) -> AIRecommendation:
 @router.get("/recommendations/knowledge", response_model=AIRecommendation)
 def find_knowledge(db: Db, user: CurrentUser, q: str = Query(min_length=2, max_length=200)) -> AIRecommendation:
     if is_llm_available():
-        return _llm_find_knowledge(db, q)
-    return _stub_find_knowledge(db, q)
+        return _llm_find_knowledge(db, user, q)
+    return _stub_find_knowledge(db, user, q)
 
 
 @router.get("/recommendations/decompose/{goal_id}", response_model=AIRecommendation)
 def decompose_goal(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
     if is_llm_available():
-        return _llm_decompose_goal(db, goal_id)
-    return _stub_decompose_goal(db, goal_id)
+        return _llm_decompose_goal(db, user, goal_id)
+    return _stub_decompose_goal(db, user, goal_id)
 
 
-def _llm_similar_goals(db: Session, goal_id: int) -> AIRecommendation:
-    goal = db.get(Goal, goal_id)
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
-    others = list(db.scalars(select(Goal).where(Goal.id != goal_id).limit(10)))
+def _llm_similar_goals(db: Session, user: User, goal_id: int) -> AIRecommendation:
+    goal = require_goal(db, user.id, goal_id)
+    others = _other_visible_goals(db, user, goal_id)
     context = f"Цель: {goal.title}\nОписание: {goal.description}\n\nДругие цели:\n"
     context += "\n".join(f"- {g.title}: {g.description[:80]}" for g in others) or "Нет других целей."
     answer = llm_complete_sync(
@@ -174,11 +186,16 @@ def _llm_similar_goals(db: Session, goal_id: int) -> AIRecommendation:
     return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
 
 
-def _llm_duplicate_goals(db: Session, goal_id: int) -> AIRecommendation:
-    goal = db.get(Goal, goal_id)
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
-    others = list(db.scalars(select(Goal).where(Goal.id != goal_id).limit(10)))
+def _llm_duplicate_goals(db: Session, user: User, goal_id: int) -> AIRecommendation:
+    goal = require_goal(db, user.id, goal_id)
+    others = _other_visible_goals(db, user, goal_id)
+
+
+def _other_visible_goals(db: Session, user: User, goal_id: int) -> list[Goal]:
+    goal_ids = user_goal_ids(db, user.id) - {goal_id}
+    if not goal_ids:
+        return []
+    return list(db.scalars(select(Goal).where(Goal.id.in_(goal_ids)).limit(10)))
     context = f"Цель: {goal.title}\nОписание: {goal.description}\n\nДругие цели:\n"
     context += "\n".join(f"- {g.title}: {g.description[:80]}" for g in others) or "Нет других целей."
     answer = llm_complete_sync(
@@ -190,12 +207,23 @@ def _llm_duplicate_goals(db: Session, goal_id: int) -> AIRecommendation:
     return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
 
 
-def _llm_missing_competences(db: Session, goal_id: int) -> AIRecommendation:
-    goal = db.get(Goal, goal_id)
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+def _llm_missing_competences(db: Session, user: User, goal_id: int) -> AIRecommendation:
+    goal = require_goal(db, user.id, goal_id)
     projects = list(db.scalars(select(Project).where(Project.goal_id == goal_id).limit(5)))
-    all_comps = list(db.scalars(select(Competence).limit(20)))
+    participant_ids = {goal.owner_id} | {p.owner_id for p in projects}
+    for proj in projects:
+        participant_ids.update(db.scalars(
+            select(ProjectMember.user_id).where(ProjectMember.project_id == proj.id)
+        ))
+    if participant_ids:
+        all_comps = list(db.scalars(
+            select(Competence).where(
+                Competence.user_id.in_(participant_ids),
+                Competence.is_visible.is_(True),
+            ).limit(20)
+        ))
+    else:
+        all_comps = []
     context = f"Цель: {goal.title}\nОписание: {goal.description}\n"
     if projects:
         context += "Проекты:\n" + "\n".join(f"- {p.title} ({p.status})" for p in projects)
@@ -212,10 +240,8 @@ def _llm_missing_competences(db: Session, goal_id: int) -> AIRecommendation:
     return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
 
 
-def _llm_goal_context(db: Session, goal_id: int) -> AIRecommendation:
-    goal = db.get(Goal, goal_id)
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+def _llm_goal_context(db: Session, user: User, goal_id: int) -> AIRecommendation:
+    goal = require_goal(db, user.id, goal_id)
     projects = list(db.scalars(select(Project).where(Project.goal_id == goal_id).limit(5)))
     decisions = list(db.scalars(select(Decision).where(Decision.goal_id == goal_id).limit(5)))
     events = list(db.scalars(select(DecisionEvent).where(DecisionEvent.decision_id.in_([d.id for d in decisions])).limit(10)))
@@ -241,28 +267,28 @@ def _llm_goal_context(db: Session, goal_id: int) -> AIRecommendation:
 @router.get("/recommendations/similar-goals/{goal_id}", response_model=AIRecommendation)
 def similar_goals(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
     if is_llm_available():
-        return _llm_similar_goals(db, goal_id)
+        return _llm_similar_goals(db, user, goal_id)
     return AIRecommendation(suggestion="AI-поиск совпадающих целей будет подключён после настройки LLM.", source="stub", confidence=0.0)
 
 
 @router.get("/recommendations/duplicate-goals/{goal_id}", response_model=AIRecommendation)
 def duplicate_goals(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
     if is_llm_available():
-        return _llm_duplicate_goals(db, goal_id)
+        return _llm_duplicate_goals(db, user, goal_id)
     return AIRecommendation(suggestion="AI-поиск дубликатов будет подключён после настройки LLM.", source="stub", confidence=0.0)
 
 
 @router.get("/recommendations/missing-competences/{goal_id}", response_model=AIRecommendation)
 def missing_competences(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
     if is_llm_available():
-        return _llm_missing_competences(db, goal_id)
+        return _llm_missing_competences(db, user, goal_id)
     return AIRecommendation(suggestion="AI-анализ компетенций будет подключён после настройки LLM.", source="stub", confidence=0.0)
 
 
 @router.get("/recommendations/goal-context/{goal_id}", response_model=AIRecommendation)
 def goal_context(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
     if is_llm_available():
-        return _llm_goal_context(db, goal_id)
+        return _llm_goal_context(db, user, goal_id)
     return AIRecommendation(suggestion="AI-восстановление контекста будет подключено после настройки LLM.", source="stub", confidence=0.0)
 
 
@@ -271,7 +297,6 @@ def ai_status(user: CurrentUser) -> dict:
     return {
         "llm_available": is_llm_available(),
         "model": settings.ai_model if is_llm_available() else None,
-        "base_url": settings.ai_base_url if is_llm_available() else None,
     }
 
 
@@ -333,9 +358,7 @@ def resolve_ai_suggestion(suggestion_id: int, payload: AISuggestionResolve, db: 
 
 @router.get("/recommendations/scenario/{goal_id}", response_model=AIRecommendation)
 def scenario_analysis(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
-    goal = db.get(Goal, goal_id)
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+    goal = require_goal(db, user.id, goal_id)
     if is_llm_available():
         answer = llm_complete_sync(
             SYSTEM_PROMPT,
@@ -349,9 +372,7 @@ def scenario_analysis(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendati
 
 @router.get("/recommendations/risk-analysis/{goal_id}", response_model=AIRecommendation)
 def risk_analysis(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
-    goal = db.get(Goal, goal_id)
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+    goal = require_goal(db, user.id, goal_id)
     if is_llm_available():
         answer = llm_complete_sync(
             SYSTEM_PROMPT,
@@ -365,9 +386,7 @@ def risk_analysis(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
 
 @router.get("/recommendations/goal-conflicts/{goal_id}", response_model=AIRecommendation)
 def goal_conflicts(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
-    goal = db.get(Goal, goal_id)
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+    goal = require_goal(db, user.id, goal_id)
     user_goals = list(db.scalars(select(Goal).where(Goal.owner_id == user.id, Goal.id != goal_id).limit(10)))
     if is_llm_available() and user_goals:
         context = "\n".join(f"- {g.title}: {g.description[:100]}" for g in user_goals)

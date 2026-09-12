@@ -91,7 +91,7 @@ class DecisionCreate(BaseModel):
     goal_id: int | None = None
     alternatives: str = Field(default="", max_length=3000)
     rationale: str = Field(default="", max_length=3000)
-    decision_method: str = Field(default="consensus", max_length=50)
+    decision_method: str = Field(default="majority", pattern="^(majority|unanimity)$")
     quorum: int = Field(default=1, ge=1)
     deadline: datetime | None = None
 
@@ -279,6 +279,18 @@ class VoteOut(BaseModel):
     variant: str
     comment: str
     created_at: datetime
+
+
+class VoteSummary(BaseModel):
+    """Aggregated vote counts; the full identifiable list is only
+    exposed after the decision is finalized."""
+    accept: int
+    reject: int
+    total: int
+    quorum: int
+    quorum_met: bool
+    own_vote: VoteOut | None = None
+    votes: list[VoteOut] | None = None
 
 
 class AISuggestionOut(BaseModel):

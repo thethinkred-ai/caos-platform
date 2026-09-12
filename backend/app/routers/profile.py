@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import current_user
 from ..models import Competence, Decision, Goal, Problem, Project, ProjectMember, Task, TeamMember, User
-from ..schemas import UserOut
 
 router = APIRouter()
 Db = Annotated[Session, Depends(get_db)]
@@ -47,8 +46,19 @@ def get_profile(user_id: int, db: Db, user: CurrentUser) -> dict:
 
     assigned_tasks = list(db.scalars(select(Task).where(Task.assignee_id == user_id, Task.status != "done").limit(20)))
 
+    # Public view of a profile must not disclose the email; only the
+    # owner sees their own address here.
+    user_payload = {
+        "id": target.id,
+        "display_name": target.display_name,
+        "bio": target.bio,
+        "created_at": target.created_at.isoformat(),
+    }
+    if target.id == user.id:
+        user_payload["email"] = target.email
+
     return {
-        "user": UserOut.model_validate(target).model_dump(),
+        "user": user_payload,
         "stats": {
             "problems": len(problems),
             "goals": len(goals),
