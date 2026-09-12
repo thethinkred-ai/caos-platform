@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from ..access import require_goal
 from ..db import get_db
 from ..errors import DomainError, FORBIDDEN_SCOPE, RESULT_ALREADY_VERIFIED, SELF_VERIFICATION_FORBIDDEN
+from ..permissions import require_capability
 from ..deps import current_user
 from ..models import AuditEvent, Evidence, GoalCriterion, GoalMeasurement, Notification, Result, User, Verification
 from ..schemas import (
@@ -154,7 +155,8 @@ def verify_result(result_id: int, payload: ResultVerify, db: Db, user: CurrentUs
     result = db.get(Result, result_id)
     if not result:
         raise HTTPException(status_code=404, detail="Result not found")
-    require_goal(db, user.id, result.goal_id)
+    goal = require_goal(db, user.id, result.goal_id)
+    require_capability(db, user, goal, "verify_result")
 
     if result.reported_by == user.id:
         raise DomainError(

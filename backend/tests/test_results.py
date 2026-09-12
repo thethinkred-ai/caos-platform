@@ -129,7 +129,19 @@ def test_goal_achieved_requires_verified_result(client, outbox):
         json={"user_id": verifier_user["id"], "role": "expert"},
     )
 
-    for action in ("propose", "accept", "activate"):
+    for action in ("propose",):
+        assert owner.post(f"/api/v1/goals/{goal['id']}/transition", json={"action": action}).status_code == 200
+
+    # D1: with an active participant, recognition requires a collective decision.
+    recognition = owner.post(
+        "/api/v1/decisions",
+        json={"title": "Признать цель", "proposal": "Признать коллективно", "goal_id": goal["id"]},
+    ).json()
+    owner.post(f"/api/v1/decisions/{recognition['id']}/vote", json={"variant": "accept"})
+    verifier.post(f"/api/v1/decisions/{recognition['id']}/vote", json={"variant": "accept"})
+    owner.post(f"/api/v1/decisions/{recognition['id']}/finalize")
+
+    for action in ("accept", "activate"):
         assert owner.post(f"/api/v1/goals/{goal['id']}/transition", json={"action": action}).status_code == 200
 
     # INV-3: no verified result -> cannot report the goal as achieved.

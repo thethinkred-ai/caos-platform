@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..access import require_goal
+from ..permissions import require_capability
 from ..db import get_db
 from ..deps import current_user
 from ..models import AuditEvent, GoalParticipation, User
@@ -58,9 +59,8 @@ def join_goal(goal_id: int, payload: GoalParticipationCreate, db: Db, user: Curr
 
     target_user_id = payload.user_id
     if target_user_id is not None and target_user_id != user.id:
-        # Inviting someone else is the goal owner's prerogative.
-        if goal.owner_id != user.id:
-            raise HTTPException(status_code=403, detail="Only the goal owner can invite participants")
+        # Inviting someone else requires the coordinate capability.
+        require_capability(db, user, goal, "coordinate")
         if not db.get(User, target_user_id):
             raise HTTPException(status_code=404, detail="User not found")
 
@@ -117,8 +117,7 @@ def update_participation_role(
     goal_id: int, user_id: int, payload: GoalParticipationRoleUpdate, db: Db, user: CurrentUser
 ) -> dict:
     goal = require_goal(db, user.id, goal_id)
-    if goal.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Only the goal owner can change roles")
+    require_capability(db, user, goal, "coordinate")
     if payload.role not in _ROLES:
         raise HTTPException(status_code=422, detail=f"Invalid role. Valid: {sorted(_ROLES)}")
     participation = db.scalar(

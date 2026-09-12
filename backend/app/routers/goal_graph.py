@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..access import require_goal
+from ..permissions import require_capability
 from ..db import get_db
 from ..deps import current_user
 from ..models import AuditEvent, Decision, Goal, GoalRelation, Project, User
@@ -68,7 +69,8 @@ def list_goal_relations(goal_id: int, db: Db, user: CurrentUser) -> list[GoalRel
 
 @router.post("/goals/{goal_id}/relations", response_model=GoalRelationOut, status_code=status.HTTP_201_CREATED)
 def create_goal_relation(goal_id: int, payload: GoalRelationCreate, db: Db, user: CurrentUser) -> GoalRelation:
-    require_goal(db, user.id, goal_id)  # source
+    goal = require_goal(db, user.id, goal_id)  # source
+    require_capability(db, user, goal, "create_relation")
     require_goal(db, user.id, payload.target_goal_id)  # target
 
     if goal_id == payload.target_goal_id:

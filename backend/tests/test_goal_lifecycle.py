@@ -29,7 +29,8 @@ def test_full_lifecycle_happy_path(client, outbox):
     assert goal["status"] == "draft"
 
     # INV-3: reaching 'achieved' requires a result verified by another
-    # participant — set that up before walking the happy path.
+    # participant — set that up before walking the happy path. The
+    # participant also means recognition needs a collective decision (D1).
     from fastapi.testclient import TestClient
 
     from app.main import app
@@ -48,6 +49,14 @@ def test_full_lifecycle_happy_path(client, outbox):
         f"/api/v1/results/{result['id']}/verify",
         json={"status": "verified", "rationale": "Подтверждено доказательствами"},
     ).status_code == 200
+
+    recognition = owner.post(
+        "/api/v1/decisions",
+        json={"title": "Признать цель", "proposal": "Признать коллективно", "goal_id": goal["id"]},
+    ).json()
+    owner.post(f"/api/v1/decisions/{recognition['id']}/vote", json={"variant": "accept"})
+    verifier.post(f"/api/v1/decisions/{recognition['id']}/vote", json={"variant": "accept"})
+    assert owner.post(f"/api/v1/decisions/{recognition['id']}/finalize").json()["status"] == "accepted"
 
     for action, expected in [
         ("propose", "proposed"),
