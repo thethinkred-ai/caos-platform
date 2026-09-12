@@ -49,7 +49,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail ?? "Не удалось выполнить запрос");
+    const error = new Error(body.detail ?? "Не удалось выполнить запрос") as Error & { code?: string };
+    error.code = body.code; // stable machine-readable code from the backend (Track E2)
+    throw error;
   }
   if (response.status === 204) return undefined as T;
   const text = await response.text();
