@@ -1,13 +1,13 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import or_, select, text, func
+from sqlalchemy import ColumnElement, or_, select, func
 from sqlalchemy.orm import Session
 
 from ..db import engine, get_db
 from ..deps import current_user
 from ..models import Decision, Goal, KnowledgeItem, Problem, Project, ProjectMember, User
-from ..schemas import DecisionOut, KnowledgeOut, SearchResults
+from ..schemas import SearchResults
 
 router = APIRouter()
 Db = Annotated[Session, Depends(get_db)]
@@ -37,81 +37,44 @@ def _user_goal_ids(db: Session, user_id: int) -> set[int]:
     return owned | project_goal_ids | member_goal_ids
 
 
-def _fts_match(db, model, q: str, *columns):
-    """Full-text search: uses plainto_tsquery on PostgreSQL, ILIKE fallback on SQLite."""
+def _escape_like(q: str) -> str:
+    return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _fts_match(q: str, *columns) -> ColumnElement[bool]:
+    """Full-text search: plainto_tsquery on PostgreSQL, ILIKE fallback on SQLite."""
     if _IS_SQLITE:
-        pattern = f"%{q}%"
-        return or_(*[col.ilike(pattern) for col in columns])
+        pattern = f"%{_escape_like(q)}%"
+        return or_(*[col.ilike(pattern, escape="\\") for col in columns])
     tsquery = func.plainto_tsquery("simple", q)
-    tsvector = func.to_tsvector("simple", func.coalesce(columns[0], "") + " " + func.coalesce(columns[1], ""))
+    tsvector = func.to_tsvector("simple", func.concat_ws(" ", *columns))
     return tsvector.op("@@")(tsquery)
+
+
+def _search_entity(db: Session, model, scope: ColumnElement[bool], columns, q: str, limit: int = 20):
+    return list(db.scalars(
+        select(model).where(scope, _fts_match(q, *columns)).limit(limit)
+    ))
 
 
 @router.get("/search", response_model=SearchResults)
 def search(db: Db, user: CurrentUser, q: str = Query(min_length=2, max_length=200)) -> SearchResults:
     project_ids = _user_project_ids(db, user.id)
     goal_ids = _user_goal_ids(db, user.id)
-    if _IS_SQLITE:
-        pattern = f"%{q}%"
-        problems = list(db.scalars(
-            select(Problem).where(
-                Problem.author_id == user.id,
-                or_(Problem.title.ilike(pattern), Problem.description.ilike(pattern))
-            ).limit(20)
-        ))
-        goals = list(db.scalars(
-            select(Goal).where(
-                Goal.id.in_(goal_ids) if goal_ids else Goal.id == -1,
-                or_(Goal.title.ilike(pattern), Goal.description.ilike(pattern))
-            ).limit(20)
-        ))
-        projects = list(db.scalars(
-            select(Project).where(
-                Project.id.in_(project_ids) if project_ids else Project.id == -1,
-                or_(Project.title.ilike(pattern), Project.description.ilike(pattern))
-            ).limit(20)
-        ))
-        knowledge = list(db.scalars(
-            select(KnowledgeItem).where(
-                (KnowledgeItem.author_id == user.id) | (KnowledgeItem.project_id.in_(project_ids)) if project_ids else KnowledgeItem.author_id == user.id,
-                or_(KnowledgeItem.title.ilike(pattern), KnowledgeItem.content.ilike(pattern))
-            ).limit(20)
-        ))
-        decisions = list(db.scalars(
-            select(Decision).where(
-                Decision.author_id == user.id,
-                or_(Decision.title.ilike(pattern), Decision.proposal.ilike(pattern))
-            ).limit(20)
-        ))
+
+    knowledge_scope: ColumnElement[bool]
+    if project_ids:
+        knowledge_scope = or_(
+            KnowledgeItem.author_id == user.id,
+            KnowledgeItem.project_id.in_(project_ids),
+        )
     else:
-        problems = list(db.scalars(
-            select(Problem).where(
-                Problem.author_id == user.id,
-                _fts_match(db, Problem, q, Problem.title, Problem.description)
-            ).limit(20)
-        ))
-        goals = list(db.scalars(
-            select(Goal).where(
-                Goal.id.in_(goal_ids) if goal_ids else Goal.id == -1,
-                _fts_match(db, Goal, q, Goal.title, Goal.description)
-            ).limit(20)
-        ))
-        projects = list(db.scalars(
-            select(Project).where(
-                Project.id.in_(project_ids) if project_ids else Project.id == -1,
-                _fts_match(db, Project, q, Project.title, Project.description)
-            ).limit(20)
-        ))
-        knowledge = list(db.scalars(
-            select(KnowledgeItem).where(
-                (KnowledgeItem.author_id == user.id) | (KnowledgeItem.project_id.in_(project_ids)) if project_ids else KnowledgeItem.author_id == user.id,
-                _fts_match(db, KnowledgeItem, q, KnowledgeItem.title, KnowledgeItem.content)
-            ).limit(20)
-        ))
-        decisions = list(db.scalars(
-            select(Decision).where(
-                Decision.author_id == user.id,
-                _fts_match(db, Decision, q, Decision.title, Decision.proposal)
-            ).limit(20)
-        ))
-    return SearchResults(problems=problems, goals=goals, projects=projects, knowledge=knowledge, decisions=decisions)
+        knowledge_scope = KnowledgeItem.author_id == user.id
+
+    return SearchResults(
+        problems=_search_entity(db, Problem, Problem.author_id == user.id, (Problem.title, Problem.description), q),
+        goals=_search_entity(db, Goal, Goal.id.in_(goal_ids) if goal_ids else Goal.id == -1, (Goal.title, Goal.description), q),
+        projects=_search_entity(db, Project, Project.id.in_(project_ids) if project_ids else Project.id == -1, (Project.title, Project.description), q),
+        knowledge=_search_entity(db, KnowledgeItem, knowledge_scope, (KnowledgeItem.title, KnowledgeItem.content), q),
+        decisions=_search_entity(db, Decision, Decision.author_id == user.id, (Decision.title, Decision.proposal), q),
+    )
