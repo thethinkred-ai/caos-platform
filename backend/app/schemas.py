@@ -268,6 +268,79 @@ class CommitmentStatusUpdate(BaseModel):
     status: str = Field(pattern="^(in_progress|fulfilled|failed|withdrawn)$")
 
 
+CRITERION_TYPES = ("binary", "quantitative", "qualitative", "composite")
+
+
+class GoalCriterionCreate(BaseModel):
+    name: str = Field(min_length=3, max_length=200)
+    description: str = Field(default="", max_length=2000)
+    criterion_type: str = Field(default="quantitative", pattern="^(binary|quantitative|qualitative|composite)$")
+    baseline: str = Field(default="", max_length=200)
+    target_value: str = Field(default="", max_length=200)
+    unit: str = Field(default="", max_length=50)
+    weight: int = Field(default=1, ge=1, le=10)
+
+
+class GoalCriterionOut(GoalCriterionCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    goal_id: int
+    created_at: datetime
+
+
+class GoalMeasurementCreate(BaseModel):
+    value: str = Field(min_length=1, max_length=200)
+    source: str = Field(default="", max_length=200)
+
+
+class GoalMeasurementOut(GoalMeasurementCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    criterion_id: int
+    measured_at: datetime
+    recorded_by: int
+
+
+class ResultCreate(BaseModel):
+    description: str = Field(min_length=3, max_length=5000)
+    expected_state: str = Field(default="", max_length=2000)
+    actual_state: str = Field(default="", max_length=2000)
+    task_id: int | None = None
+
+
+class ResultOut(ResultCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    goal_id: int
+    status: str
+    reported_by: int
+    created_at: datetime
+    verified_at: datetime | None = None
+    evidence_count: int = 0
+
+
+class EvidenceCreate(BaseModel):
+    evidence_type: str = Field(
+        default="document",
+        pattern="^(document|data|measurement|observation|linked_record|external_source|system_metric|collective_assessment)$",
+    )
+    content: str = Field(min_length=1, max_length=5000)
+    source: str = Field(default="", max_length=500)
+
+
+class EvidenceOut(EvidenceCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    result_id: int
+    created_by: int
+    created_at: datetime
+
+
+class ResultVerify(BaseModel):
+    status: str = Field(pattern="^(verified|partially_verified|rejected)$")
+    rationale: str = Field(min_length=3, max_length=2000)
+
+
 class SearchResults(BaseModel):
     problems: list[ProblemOut] = []
     goals: list[GoalOut] = []

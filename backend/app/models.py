@@ -155,6 +155,86 @@ class Commitment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class GoalCriterion(Base):
+    """A checkable success criterion of a goal (Track C5): type,
+    baseline and target make achievement measurable instead of a free
+    text field."""
+
+    __tablename__ = "goal_criteria"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    goal_id: Mapped[int] = mapped_column(ForeignKey("goals.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    criterion_type: Mapped[str] = mapped_column(String(20), default="quantitative")
+    baseline: Mapped[str] = mapped_column(Text, default="")
+    target_value: Mapped[str] = mapped_column(Text, default="")
+    unit: Mapped[str] = mapped_column(String(50), default="")
+    weight: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class GoalMeasurement(Base):
+    """A measured value of a criterion over time: baseline -> ... -> actual."""
+
+    __tablename__ = "goal_measurements"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    criterion_id: Mapped[int] = mapped_column(ForeignKey("goal_criteria.id"), index=True)
+    value: Mapped[str] = mapped_column(Text)
+    measured_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    source: Mapped[str] = mapped_column(String(200), default="")
+    recorded_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+
+
+class Result(Base):
+    """A change in the state of affairs produced by activity — not the
+    fact that a task was completed (INV-3)."""
+
+    __tablename__ = "results"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    goal_id: Mapped[int] = mapped_column(ForeignKey("goals.id"), index=True)
+    task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id"), nullable=True)
+    description: Mapped[str] = mapped_column(Text)
+    expected_state: Mapped[str] = mapped_column(Text, default="")
+    actual_state: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(
+        String(30), default="reported", index=True
+    )  # reported / under_verification / verified / partially_verified / rejected / disputed
+    reported_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class Evidence(Base):
+    """Objective support for a result: document, measurement, metric..."""
+
+    __tablename__ = "evidence"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    result_id: Mapped[int] = mapped_column(ForeignKey("results.id"), index=True)
+    evidence_type: Mapped[str] = mapped_column(String(30), default="document")
+    content: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(500), default="")
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class Verification(Base):
+    """A result verification by a participant other than the reporter
+    (INV-4): reported != verified."""
+
+    __tablename__ = "verifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    result_id: Mapped[int] = mapped_column(ForeignKey("results.id"), index=True)
+    verifier_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String(30))  # verified / partially_verified / rejected
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Decision(Base):
     __tablename__ = "decisions"
 

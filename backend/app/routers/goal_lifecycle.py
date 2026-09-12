@@ -57,6 +57,26 @@ def transition_goal(goal_id: int, payload: GoalTransition, db: Db, user: Current
             detail=f"Cannot '{payload.action}' from status '{goal.status}'. Allowed from: {sorted(allowed_from)}",
         )
 
+    # INV-3: a goal is achieved only through a result verified by another
+    # participant — completing tasks is never enough.
+    if payload.action == "report-achieved":
+        from sqlalchemy import select
+
+        from ..models import Result
+
+        has_verified = db.scalar(
+            select(Result.id).where(
+                Result.goal_id == goal_id,
+                Result.status.in_(("verified", "partially_verified")),
+            ).limit(1)
+        )
+        if not has_verified:
+            raise HTTPException(
+                status_code=409,
+                detail="Goal cannot be reported achieved without a verified result "
+                "(report a result under /goals/{id}/results and have another participant verify it)",
+            )
+
     goal.status = target
     db.add(AuditEvent(
         actor_id=user.id, entity_type="goal", entity_id=goal.id,

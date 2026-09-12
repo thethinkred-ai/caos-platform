@@ -6,7 +6,7 @@ from slowapi.util import get_remote_address
 
 from .config import get_settings
 from .db import Base, engine
-from .routers import ai, auth, commitments, competences, dashboard, entities, google, goal_graph, goal_lifecycle, goal_participation, knowledge, notifications, profile, search, stepik
+from .routers import ai, auth, commitments, competences, dashboard, entities, google, goal_graph, goal_lifecycle, goal_participation, knowledge, notifications, profile, results, search, stepik
 
 settings = get_settings()
 if settings.database_url.startswith("sqlite"):
@@ -58,6 +58,7 @@ app.include_router(goal_graph.router, prefix="/api/v1", tags=["goal-graph"])
 app.include_router(goal_lifecycle.router, prefix="/api/v1", tags=["goal-lifecycle"])
 app.include_router(goal_participation.router, prefix="/api/v1", tags=["goal-participation"])
 app.include_router(commitments.router, prefix="/api/v1", tags=["commitments"])
+app.include_router(results.router, prefix="/api/v1", tags=["results"])
 app.include_router(search.router, prefix="/api/v1", tags=["search"])
 app.include_router(knowledge.router, prefix="/api/v1", tags=["knowledge"])
 app.include_router(dashboard.router, prefix="/api/v1", tags=["dashboard"])

@@ -24,9 +24,30 @@ def _owner(outbox, email="cycle@example.com"):
 
 
 def test_full_lifecycle_happy_path(client, outbox):
-    owner, _ = _owner(outbox)
+    owner, owner_user = _owner(outbox)
     goal = _goal(owner)
     assert goal["status"] == "draft"
+
+    # INV-3: reaching 'achieved' requires a result verified by another
+    # participant — set that up before walking the happy path.
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    verifier = TestClient(app)
+    verifier_user = register_and_login(verifier, outbox, email="verifier@example.com", display_name="Verifier")
+    owner.post(
+        f"/api/v1/goals/{goal['id']}/participations",
+        json={"user_id": verifier_user["id"], "role": "expert"},
+    )
+    result = owner.post(
+        f"/api/v1/goals/{goal['id']}/results",
+        json={"description": "Целевое состояние достигнуто"},
+    ).json()
+    assert verifier.post(
+        f"/api/v1/results/{result['id']}/verify",
+        json={"status": "verified", "rationale": "Подтверждено доказательствами"},
+    ).status_code == 200
 
     for action, expected in [
         ("propose", "proposed"),
