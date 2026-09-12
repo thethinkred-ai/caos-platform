@@ -9,10 +9,10 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..auth_utils import issue_session
 from ..config import get_settings
 from ..db import get_db
 from ..models import AuthIdentity, AuditEvent, User
-from ..security import create_access_token, create_refresh_token, get_cookie_settings, get_refresh_cookie_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -23,7 +23,6 @@ GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_API_URL = "https://www.googleapis.com/oauth2/v2"
 
 STATE_COOKIE = "caos_oauth_state"
-PKCE_VERIFIER_COOKIE = "caos_oauth_pkce"
 
 
 @router.get("/auth/google")
@@ -69,7 +68,8 @@ def google_callback(code: str | None = None, state: str | None = None, request: 
         token_resp = httpx.post(GOOGLE_TOKEN_URL, data=token_data, timeout=15)
         logger.info("Google token exchange status: %s", token_resp.status_code)
         if token_resp.status_code != 200:
-            logger.error("Google token exchange failed: HTTP %s body=%s", token_resp.status_code, token_resp.text)
+            # Never log the response body: on errors it can echo the secret.
+            logger.error("Google token exchange failed: HTTP %s", token_resp.status_code)
         token_resp.raise_for_status()
         access_token = token_resp.json()["access_token"]
 
@@ -97,31 +97,28 @@ def google_callback(code: str | None = None, state: str | None = None, request: 
             user.display_name = display_name
         else:
             user = db.scalar(select(User).where(User.email == email))
+            if not email_verified:
+                # An unverified Google email must never grant access to an
+                # existing local account nor create a login-able one.
+                return RedirectResponse(url=f"{frontend_url}/?error=email_not_verified")
             if user:
-                if email_verified:
-                    db.add(AuthIdentity(provider="google", provider_subject=google_id, user_id=user.id, verified_email=True))
+                db.add(AuthIdentity(provider="google", provider_subject=google_id, user_id=user.id, verified_email=True))
             else:
                 user = User(
                     email=email,
                     password_hash=None,
                     display_name=display_name,
                     stepik_id=None,
-                    is_verified=email_verified,
+                    is_verified=True,
                 )
                 db.add(user)
                 db.flush()
-                if email_verified:
-                    db.add(AuthIdentity(provider="google", provider_subject=google_id, user_id=user.id, verified_email=True))
+                db.add(AuthIdentity(provider="google", provider_subject=google_id, user_id=user.id, verified_email=True))
 
         db.add(AuditEvent(actor_id=user.id, entity_type="user", entity_id=user.id, action="google_login", detail=""))
-        db.commit()
-        db.refresh(user)
-
-        access_jwt = create_access_token(user.id)
-        refresh_jwt = create_refresh_token(user.id)
         response = RedirectResponse(url=f"{frontend_url}/auth/callback")
-        response.set_cookie(value=access_jwt, **get_cookie_settings())
-        response.set_cookie(value=refresh_jwt, **get_refresh_cookie_settings())
+        issue_session(response, user.id, db)
+        db.commit()
         response.delete_cookie(STATE_COOKIE, path="/")
         return response
     except Exception as e:

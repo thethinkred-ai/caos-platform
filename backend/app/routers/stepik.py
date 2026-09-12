@@ -9,11 +9,11 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..auth_utils import issue_session
 from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
 from ..models import AuditEvent, AuthIdentity, User
-from ..security import create_access_token, create_refresh_token, get_cookie_settings, get_refresh_cookie_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -122,14 +122,9 @@ def stepik_callback(code: str | None = None, state: str | None = None, request: 
             db.add(AuthIdentity(provider="stepik", provider_subject=str(stepik_id), user_id=user.id, verified_email=True))
 
         db.add(AuditEvent(actor_id=user.id, entity_type="user", entity_id=user.id, action="stepik_login", detail=""))
-        db.commit()
-        db.refresh(user)
-
-        access_jwt = create_access_token(user.id)
-        refresh_jwt = create_refresh_token(user.id)
         response = RedirectResponse(url=f"{frontend_url}/auth/callback")
-        response.set_cookie(value=access_jwt, **get_cookie_settings())
-        response.set_cookie(value=refresh_jwt, **get_refresh_cookie_settings())
+        issue_session(response, user.id, db)
+        db.commit()
         response.delete_cookie(STATE_COOKIE, path="/")
         return response
     except Exception as e:

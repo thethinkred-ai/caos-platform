@@ -1,53 +1,64 @@
-import hashlib
-import secrets as _secrets
-from datetime import UTC, datetime, timedelta
+import logging
+from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from ..auth_utils import issue_session, revoke_sessions
 from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
 from ..models import AuditEvent, Session as SessionModel, User
 from ..schemas import (
-    ChangePasswordRequest, ProfileUpdate, RefreshOut, ResetPasswordConfirm,
-    ResetPasswordRequest, TokenOut, UserCreate, UserLogin, UserOut,
+    ChangePasswordRequest, ProfileUpdate, ResetPasswordConfirm,
+    ResetPasswordRequest, UserCreate, UserLogin, UserOut,
 )
 from ..email import send_email
 from ..security import (
-    COOKIE_NAME, REFRESH_COOKIE_NAME, create_access_token, create_refresh_token,
-    decode_refresh_token, get_cookie_settings, get_refresh_cookie_settings,
-    hash_password, verify_password,
+    REFRESH_COOKIE_NAME, RESET_TOKEN_TTL, VERIFICATION_TOKEN_TTL,
+    decode_refresh_token, hash_email_token, hash_password, is_valid_email_token,
+    make_email_token, verify_password,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 Db = Annotated[Session, Depends(get_db)]
 
+_REGISTERED_MESSAGE = {"message": "Account created. Check your email for a verification link."}
 
-def _set_auth_cookies(response: JSONResponse, user_id: int, db: Session) -> None:
-    access = create_access_token(user_id)
-    refresh = create_refresh_token(user_id)
-    _, jti = decode_refresh_token(refresh)
+
+def _send_email_safely(to: str, subject: str, body: str) -> None:
+    try:
+        send_email(to, subject, body)
+    except Exception:
+        # The user row is already committed; a broken SMTP must not turn
+        # registration into a 500 and an unverifiable account.
+        logger.exception("Failed to send email to %s", to)
+
+
+def _verification_email(user: User, raw_token: str) -> None:
     settings = get_settings()
-    db.add(SessionModel(
-        user_id=user_id,
-        jti=jti,
-        refresh_token_hash=hashlib.sha256(refresh.encode()).hexdigest(),
-        expires_at=datetime.now(UTC) + timedelta(days=settings.refresh_token_days),
-    ))
-    db.flush()
-    response.set_cookie(value=access, **get_cookie_settings())
-    response.set_cookie(value=refresh, **get_refresh_cookie_settings())
+    verify_url = f"{settings.frontend_url}/auth/verify?token={raw_token}"
+    _send_email_safely(
+        user.email,
+        "Подтверждение регистрации — CAOS",
+        f"<p>Здравствуйте, {user.display_name}!</p>"
+        f"<p>Для подтверждения регистрации перейдите по ссылке:</p>"
+        f"<p><a href=\"{verify_url}\">{verify_url}</a></p>"
+        f"<p>Ссылка действует 24 часа.</p>",
+    )
 
 
 def _clear_auth_cookies(response: JSONResponse) -> None:
-    response.delete_cookie(COOKIE_NAME, path="/")
+    response.delete_cookie("caos_token", path="/")
     response.delete_cookie(REFRESH_COOKIE_NAME, path="/")
 
 
@@ -57,33 +68,33 @@ def register(payload: UserCreate, request: Request, db: Db) -> JSONResponse:
     email = payload.email.lower()
     existing = db.scalar(select(User).where(User.email == email))
     if existing:
-        return JSONResponse(
-            status_code=201,
-            content={"message": "If this email is not registered, a verification link has been sent."},
-        )
+        # Same response as for a fresh registration (no user enumeration).
+        # Re-send the verification link so a lost email cannot strand an
+        # unverified account forever.
+        if not existing.is_verified and existing.password_hash:
+            raw_token, token_hash = make_email_token("verify", VERIFICATION_TOKEN_TTL)
+            existing.verification_token = token_hash
+            db.commit()
+            _verification_email(existing, raw_token)
+        return JSONResponse(status_code=201, content=_REGISTERED_MESSAGE)
+    raw_token, token_hash = make_email_token("verify", VERIFICATION_TOKEN_TTL)
     user = User(
         email=email,
         password_hash=hash_password(payload.password),
         display_name=payload.display_name,
         is_verified=False,
-        verification_token=_secrets.token_urlsafe(32),
+        verification_token=token_hash,
         consent_accepted_at=datetime.now(UTC),
     )
     db.add(user)
-    db.commit()
-    settings = get_settings()
-    verify_url = f"{settings.frontend_url}/auth/verify?token={user.verification_token}"
-    send_email(
-        email,
-        "Подтверждение регистрации — CAOS",
-        f"<p>Здравствуйте, {payload.display_name}!</p>"
-        f"<p>Для подтверждения регистрации перейдите по ссылке:</p>"
-        f"<p><a href=\"{verify_url}\">{verify_url}</a></p>",
-    )
-    return JSONResponse(
-        status_code=201,
-        content={"message": "Account created. Check your email for a verification link."},
-    )
+    try:
+        db.commit()
+    except IntegrityError:
+        # Concurrent registration of the same email — behave as if it existed.
+        db.rollback()
+        return JSONResponse(status_code=201, content=_REGISTERED_MESSAGE)
+    _verification_email(user, raw_token)
+    return JSONResponse(status_code=201, content=_REGISTERED_MESSAGE)
 
 
 @router.post("/login")
@@ -94,15 +105,25 @@ def login(payload: UserLogin, request: Request, db: Db) -> JSONResponse:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="Email not verified. Check your email.")
-    response = JSONResponse(content={"user": UserOut.model_validate(user).model_dump()})
-    _set_auth_cookies(response, user.id, db)
+    response = JSONResponse(content={"user": UserOut.model_validate(user).model_dump(mode="json")})
+    issue_session(response, user.id, db)
     db.add(AuditEvent(actor_id=user.id, entity_type="user", entity_id=user.id, action="login", detail=""))
     db.commit()
     return response
 
 
 @router.post("/logout")
-def logout() -> JSONResponse:
+def logout(request: Request, db: Db) -> JSONResponse:
+    refresh = request.cookies.get(REFRESH_COOKIE_NAME)
+    if refresh:
+        try:
+            _, jti = decode_refresh_token(refresh)
+            session = db.scalar(select(SessionModel).where(SessionModel.jti == jti))
+            if session:
+                session.revoked = True
+                db.commit()
+        except Exception:
+            pass  # Token already invalid — nothing to revoke.
     response = JSONResponse(content={"message": "Logged out"})
     _clear_auth_cookies(response)
     return response
@@ -125,15 +146,15 @@ def refresh_token(request: Request, db: Db) -> JSONResponse:
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     response = JSONResponse(content={"message": "Token refreshed"})
-    _set_auth_cookies(response, user.id, db)
+    issue_session(response, user.id, db)
     db.commit()
     return response
 
 
 @router.get("/verify")
 def verify_email(token: str, db: Db) -> JSONResponse:
-    user = db.scalar(select(User).where(User.verification_token == token))
-    if not user:
+    user = db.scalar(select(User).where(User.verification_token == hash_email_token(token)))
+    if not user or not is_valid_email_token(token, "verify"):
         raise HTTPException(status_code=400, detail="Invalid or expired verification token")
     user.is_verified = True
     user.verification_token = None
@@ -159,42 +180,56 @@ def update_profile(payload: ProfileUpdate, db: Db, user: Annotated[User, Depends
 @router.post("/change-password")
 def change_password(
     payload: ChangePasswordRequest,
+    request: Request,
     db: Db,
     user: Annotated[User, Depends(current_user)],
 ) -> JSONResponse:
     if not verify_password(payload.current_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     user.password_hash = hash_password(payload.new_password)
+    current_jti = None
+    refresh = request.cookies.get(REFRESH_COOKIE_NAME)
+    if refresh:
+        try:
+            _, current_jti = decode_refresh_token(refresh)
+        except Exception:
+            current_jti = None
+    # A changed password invalidates every other session.
+    revoke_sessions(db, user.id, keep_jti=current_jti)
     db.add(AuditEvent(actor_id=user.id, entity_type="user", entity_id=user.id, action="password_changed", detail=""))
     db.commit()
     return JSONResponse(content={"message": "Password changed"})
 
 
 @router.post("/reset-password")
-def reset_password(payload: ResetPasswordRequest, db: Db) -> JSONResponse:
+@limiter.limit("5/minute")
+def reset_password(payload: ResetPasswordRequest, request: Request, db: Db) -> JSONResponse:
     user = db.scalar(select(User).where(User.email == payload.email.lower()))
     if user:
-        user.verification_token = _secrets.token_urlsafe(32)
+        raw_token, token_hash = make_email_token("reset", RESET_TOKEN_TTL)
+        user.verification_token = token_hash
         db.commit()
         settings = get_settings()
-        reset_url = f"{settings.frontend_url}/auth/reset-password?token={user.verification_token}"
-        send_email(
+        reset_url = f"{settings.frontend_url}/auth/reset-password?token={raw_token}"
+        _send_email_safely(
             payload.email.lower(),
             "Сброс пароля — CAOS",
             f"<p>Для сброса пароля перейдите по ссылке:</p>"
             f"<p><a href=\"{reset_url}\">{reset_url}</a></p>"
-            f"<p>Если вы не запрашивали сброс пароля, проигнорируйте это письмо.</p>",
+            f"<p>Ссылка действует 1 час. Если вы не запрашивали сброс пароля, проигнорируйте это письмо.</p>",
         )
     return JSONResponse(content={"message": "If this email is registered, a reset link has been sent."})
 
 
 @router.post("/reset-password/confirm")
 def reset_password_confirm(payload: ResetPasswordConfirm, db: Db) -> JSONResponse:
-    user = db.scalar(select(User).where(User.verification_token == payload.token))
-    if not user:
+    user = db.scalar(select(User).where(User.verification_token == hash_email_token(payload.token)))
+    if not user or not is_valid_email_token(payload.token, "reset"):
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
     user.password_hash = hash_password(payload.new_password)
     user.verification_token = None
+    # Whoever requested the reset may hold an old stolen session — drop them all.
+    revoke_sessions(db, user.id)
     db.add(AuditEvent(actor_id=user.id, entity_type="user", entity_id=user.id, action="password_reset", detail=""))
     db.commit()
     return JSONResponse(content={"message": "Password reset successful. You can now log in."})
@@ -218,6 +253,7 @@ def export_user_data(db: Db, user: Annotated[User, Depends(current_user)]) -> JS
 @router.delete("/me")
 def delete_account(db: Db, user: Annotated[User, Depends(current_user)]) -> JSONResponse:
     db.add(AuditEvent(actor_id=user.id, entity_type="user", entity_id=user.id, action="account_deleted", detail=""))
+    revoke_sessions(db, user.id)
     user.email = f"deleted_{user.id}@deleted.local"
     user.display_name = "Deleted User"
     user.password_hash = None

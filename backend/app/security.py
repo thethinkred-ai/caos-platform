@@ -10,6 +10,9 @@ from .config import get_settings
 COOKIE_NAME = "caos_token"
 REFRESH_COOKIE_NAME = "caos_refresh"
 
+VERIFICATION_TOKEN_TTL = timedelta(hours=24)
+RESET_TOKEN_TTL = timedelta(hours=1)
+
 
 def hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
@@ -17,7 +20,10 @@ def hash_password(password: str) -> str:
     return f"pbkdf2_sha256$310000${salt.hex()}${digest.hex()}"
 
 
-def verify_password(password: str, encoded: str) -> bool:
+def verify_password(password: str, encoded: str | None) -> bool:
+    if not encoded:
+        # OAuth-only accounts have no password; password login is simply not possible.
+        return False
     try:
         algorithm, rounds, salt_hex, digest_hex = encoded.split("$")
         if algorithm != "pbkdf2_sha256":
@@ -26,6 +32,27 @@ def verify_password(password: str, encoded: str) -> bool:
         return hmac.compare_digest(digest.hex(), digest_hex)
     except (ValueError, TypeError):
         return False
+
+
+def make_email_token(purpose: str, ttl: timedelta) -> tuple[str, str]:
+    """Return (raw_token, token_hash). The raw token goes into the email link,
+    only its hash is stored in the database."""
+    expires = int((datetime.now(UTC) + ttl).timestamp())
+    raw = f"{purpose}:{expires}:{secrets.token_urlsafe(24)}"
+    return raw, hash_email_token(raw)
+
+
+def hash_email_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def is_valid_email_token(raw: str, purpose: str) -> bool:
+    """Check purpose and expiry of a raw token (format 'purpose:expires:secret')."""
+    try:
+        token_purpose, expires, _ = raw.split(":", 2)
+    except ValueError:
+        return False
+    return token_purpose == purpose and datetime.now(UTC).timestamp() < int(expires)
 
 
 def create_access_token(user_id: int) -> str:
