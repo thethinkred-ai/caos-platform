@@ -25,6 +25,7 @@ jobs:
             cd /opt/caos/backend
             source venv/bin/activate
             pip install -r requirements.txt
+            PYTHONPATH=. python -m alembic upgrade head
             systemctl restart caos-api.service
             sleep 3
             systemctl is-active caos-api.service

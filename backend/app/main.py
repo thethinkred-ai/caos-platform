@@ -9,7 +9,10 @@ from .db import Base, engine
 from .routers import ai, auth, competences, dashboard, entities, google, knowledge, notifications, profile, search, stepik
 
 settings = get_settings()
-Base.metadata.create_all(bind=engine)
+if settings.database_url.startswith("sqlite"):
+    # Dev/test convenience only; production schema is managed by Alembic
+    # (create_all cannot evolve existing tables).
+    Base.metadata.create_all(bind=engine)
 
 limiter = Limiter(key_func=get_remote_address)
 
