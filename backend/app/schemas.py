@@ -122,6 +122,10 @@ class GoalImpact(BaseModel):
     decisions: int
 
 
+class GoalTransition(BaseModel):
+    action: str = Field(min_length=3, max_length=30, pattern="^[a-z-]+$")
+
+
 class DecisionCreate(BaseModel):
     title: str = Field(min_length=3, max_length=200)
     proposal: str = Field(min_length=1, max_length=5000)
