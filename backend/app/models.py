@@ -93,6 +93,25 @@ class Goal(Base):
     decisions: Mapped[list["Decision"]] = relationship(back_populates="goal")
 
 
+class GoalRelation(Base):
+    """Typed edge of the goal graph (ADR-0002).
+
+    parent_goal_id on Goal remains sugar over a `concretizes` edge; the
+    graph itself lives here.
+    """
+
+    __tablename__ = "goal_relations"
+    __table_args__ = (UniqueConstraint("source_goal_id", "target_goal_id", "relation_type", name="uq_goal_relation"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_goal_id: Mapped[int] = mapped_column(ForeignKey("goals.id"), index=True)
+    target_goal_id: Mapped[int] = mapped_column(ForeignKey("goals.id"), index=True)
+    relation_type: Mapped[str] = mapped_column(String(30))
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Decision(Base):
     __tablename__ = "decisions"
 

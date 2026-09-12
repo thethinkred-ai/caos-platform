@@ -85,6 +85,43 @@ class GoalOut(GoalCreate):
 GoalOut.model_rebuild()
 
 
+GOAL_RELATION_TYPES = (
+    "concretizes", "depends_on", "supports",
+    "conflicts_with", "contributes_to", "blocks", "supersedes",
+)
+_RELATION_PATTERN = "^(" + "|".join(GOAL_RELATION_TYPES) + ")$"
+
+
+class GoalRelationCreate(BaseModel):
+    target_goal_id: int
+    relation_type: str = Field(pattern=_RELATION_PATTERN)
+    rationale: str = Field(min_length=3, max_length=2000)
+
+
+class GoalRelationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    source_goal_id: int
+    target_goal_id: int
+    relation_type: str
+    rationale: str
+    author_id: int
+    created_at: datetime
+
+
+class GoalImpact(BaseModel):
+    """What stops or is affected if this goal fails — the operational
+    value of the graph (critique, section 33/51)."""
+    goal_id: int
+    direct_dependents: int
+    transitive_dependents: int
+    supporters: int
+    conflicts: int
+    sub_goals: int
+    projects: int
+    decisions: int
+
+
 class DecisionCreate(BaseModel):
     title: str = Field(min_length=3, max_length=200)
     proposal: str = Field(min_length=1, max_length=5000)
