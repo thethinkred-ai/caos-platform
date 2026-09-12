@@ -119,6 +119,25 @@ FastAPI + PostgreSQL + React/TS; разделение Problem/Goal/Decision/Proj
 
 ---
 
+## Приложение: решения по «критика CAOS часть два» (Шаги 17–36)
+
+Часть два содержит конкретный план переделки репозитория (ER-поля, порядок PR-01…PR-16, аудит файл-за-файлом). Сверка с реализованным: GoalRelation, Participation, Commitment, честные decision_method, Alembic, ADR — соответствуют. Принятые решения:
+
+1. **[Конфликт] owner-only переходы lifecycle** — часть вторая требует, чтобы owner не был источником власти (Шаги 18/20/29). Текущая реализация переходов только owner'ом — переходный этап; в C6/D1 право переходов переходит к матрице (coordinator для операционных, процедура признания для accept).
+2. **GoalProposal как статусы Goal, а не отдельная сущность** — принято осознанно (проще, совместимо); отдельная таблица не вводится до появления safety-скрининга (H2), где статусы FLAGGED/REVIEW/RELEASED станут обязательными.
+3. **Дополнения к Track C** (из точных полей части два):
+   - C4+: `commitments.success_criteria`, `completed_at`; source `decision|delegation|agreement`.
+   - C5+: `GoalCriterion(criterion_type ∈ binary|quantitative|qualitative|composite, baseline, target_value, unit, weight)` + `GoalMeasurement(value, measured_at, source, recorded_by)`; `Result.status ∈ reported|under_verification|verified|partially_verified|rejected|disputed`; 8 типов Evidence; `Verification(verifier_id ≠ reporter)`.
+   - C3+: `participations.visibility`, роль `delegate`.
+   - C6+: сущность `Challenge` (target, claim, argument, evidence, alternative, status, resolution) — возражение нельзя потерять.
+4. **E2+**: машиночитаемые коды ошибок (`INVALID_STATE_TRANSITION`, `FORBIDDEN_SCOPE`, …) вместо строковых detail.
+5. **D1+**: `Delegation(issuer, recipient, capability, scope, valid_from, valid_until, revoked_at)` — отзыв проще выдачи; 15 атомарных Capability вместо `user.role`.
+6. **Новые инфра-пункты**: DomainEvent + OutboxEvent (transactional outbox, без Kafka); `AGENTS.md` + `CURRENT_STATE.md` + `MIGRATION_STATUS.md`; разбиение `models.py` на доменные модули; CI: ruff + mypy + secret scan + restore-test.
+7. **Фронтенд (F)**: уточнённая часть вторым — стек Tailwind + shadcn/ui + Radix; навигация «Деятельность / Цели / Решения / Знания»; Goal Workspace с Timeline и контекстным графом (depth=1); прогрессивная форма предложения цели; PermissionGate как UX (не защита).
+8. **«Что пока НЕ делать» подтверждено**: Neo4j, Kafka, микросервисы, рейтинги людей, рекомендательный движок, мобильное приложение, real-time collaboration.
+
+---
+
 ## Порядок исполнения и вехи
 
 | # | Этап | Треки | Веха |
