@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from ..access import require_goal
 from ..db import get_db
+from ..errors import ACHIEVEMENT_REQUIRES_VERIFIED_RESULT, DomainError, FORBIDDEN_SCOPE, INVALID_STATE_TRANSITION
 from ..deps import current_user
 from ..models import AuditEvent, Goal, Notification, User
 from ..schemas import GoalOut, GoalTransition
@@ -46,15 +47,15 @@ def transition_goal(goal_id: int, payload: GoalTransition, db: Db, user: Current
     goal = require_goal(db, user.id, goal_id)
     # Ownership for now; the participation permission matrix arrives with C3/D1.
     if goal.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Only the goal owner can change the goal state")
+        raise DomainError(403, FORBIDDEN_SCOPE, "Only the goal owner can change the goal state")
 
     if payload.action not in GOAL_TRANSITIONS:
         raise HTTPException(status_code=422, detail=f"Unknown action. Valid: {sorted(GOAL_TRANSITIONS)}")
     allowed_from, target = GOAL_TRANSITIONS[payload.action]
     if goal.status not in allowed_from:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Cannot '{payload.action}' from status '{goal.status}'. Allowed from: {sorted(allowed_from)}",
+        raise DomainError(
+            409, INVALID_STATE_TRANSITION,
+            f"Cannot '{payload.action}' from status '{goal.status}'. Allowed from: {sorted(allowed_from)}",
         )
 
     # INV-3: a goal is achieved only through a result verified by another
@@ -71,9 +72,9 @@ def transition_goal(goal_id: int, payload: GoalTransition, db: Db, user: Current
             ).limit(1)
         )
         if not has_verified:
-            raise HTTPException(
-                status_code=409,
-                detail="Goal cannot be reported achieved without a verified result "
+            raise DomainError(
+                409, ACHIEVEMENT_REQUIRES_VERIFIED_RESULT,
+                "Goal cannot be reported achieved without a verified result "
                 "(report a result under /goals/{id}/results and have another participant verify it)",
             )
 

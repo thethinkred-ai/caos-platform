@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..access import require_goal
 from ..db import get_db
+from ..errors import DomainError, FORBIDDEN_SCOPE, RESULT_ALREADY_VERIFIED, SELF_VERIFICATION_FORBIDDEN
 from ..deps import current_user
 from ..models import AuditEvent, Evidence, GoalCriterion, GoalMeasurement, Notification, Result, User, Verification
 from ..schemas import (
@@ -156,14 +157,14 @@ def verify_result(result_id: int, payload: ResultVerify, db: Db, user: CurrentUs
     require_goal(db, user.id, result.goal_id)
 
     if result.reported_by == user.id:
-        raise HTTPException(
-            status_code=403,
-            detail="The reporter of a result cannot verify it - another participant must verify",
+        raise DomainError(
+            403, SELF_VERIFICATION_FORBIDDEN,
+            "The reporter of a result cannot verify it - another participant must verify",
         )
     if result.status not in _VERIFIABLE_STATUSES:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Result in status '{result.status}' cannot be verified again",
+        raise DomainError(
+            409, RESULT_ALREADY_VERIFIED,
+            f"Result in status '{result.status}' cannot be verified again",
         )
 
     verification = Verification(

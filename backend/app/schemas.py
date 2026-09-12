@@ -132,13 +132,22 @@ class DecisionCreate(BaseModel):
     goal_id: int | None = None
     alternatives: str = Field(default="", max_length=3000)
     rationale: str = Field(default="", max_length=3000)
-    decision_method: str = Field(default="majority", pattern="^(majority|unanimity)$")
+    decision_method: str = Field(
+        default="majority",
+        pattern="^(majority|supermajority|unanimity|consent)$",
+    )
     quorum: int = Field(default=1, ge=1)
     deadline: datetime | None = None
+    valid_until: datetime | None = None
+    review_at: datetime | None = None
 
 
 class DecisionEventCreate(BaseModel):
-    event_type: str = Field(min_length=3, max_length=30)
+    event_type: str = Field(
+        min_length=3,
+        max_length=30,
+        pattern="^(proposal|argument|objection|question|alternative|revision|revised|clarification|evidence|comment|accepted|rejected)$",
+    )
     content: str = Field(min_length=1, max_length=5000)
 
 
@@ -339,6 +348,30 @@ class EvidenceOut(EvidenceCreate):
 class ResultVerify(BaseModel):
     status: str = Field(pattern="^(verified|partially_verified|rejected)$")
     rationale: str = Field(min_length=3, max_length=2000)
+
+
+class ChallengeCreate(BaseModel):
+    target_type: str = Field(pattern="^(goal|decision|result)$")
+    target_id: int
+    claim: str = Field(min_length=3, max_length=2000)
+    argument: str = Field(min_length=3, max_length=5000)
+    evidence: str = Field(default="", max_length=5000)
+    alternative: str = Field(default="", max_length=5000)
+
+
+class ChallengeOut(ChallengeCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    author_id: int
+    status: str
+    resolution: str
+    created_at: datetime
+    resolved_at: datetime | None = None
+
+
+class ChallengeResolve(BaseModel):
+    status: str = Field(pattern="^(acknowledged|addressed|accepted|rejected|deferred|withdrawn)$")
+    resolution: str = Field(min_length=3, max_length=5000)
 
 
 class SearchResults(BaseModel):

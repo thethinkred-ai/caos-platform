@@ -235,6 +235,43 @@ class Verification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class Challenge(Base):
+    """A structured objection to a significant object — goal, decision or
+    result (Track C6). An objection is an object: it cannot be lost, and
+    rejecting it requires a recorded answer."""
+
+    __tablename__ = "challenges"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    target_type: Mapped[str] = mapped_column(String(20), index=True)  # goal / decision / result
+    target_id: Mapped[int] = mapped_column(index=True)
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    claim: Mapped[str] = mapped_column(Text)
+    argument: Mapped[str] = mapped_column(Text)
+    evidence: Mapped[str] = mapped_column(Text, default="")
+    alternative: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(
+        String(20), default="open", index=True
+    )  # open / acknowledged / addressed / accepted / rejected / withdrawn / deferred
+    resolution: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class ProposalVersion(Base):
+    """Immutable versions of a decision proposal: what exactly was
+    discussed and accepted at each point in time."""
+
+    __tablename__ = "proposal_versions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    decision_id: Mapped[int] = mapped_column(ForeignKey("decisions.id"), index=True)
+    version: Mapped[int] = mapped_column(default=1)
+    content: Mapped[str] = mapped_column(Text)
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Decision(Base):
     __tablename__ = "decisions"
 
@@ -250,6 +287,8 @@ class Decision(Base):
     decision_method: Mapped[str] = mapped_column(String(50), default="majority")
     quorum: Mapped[int] = mapped_column(default=1)
     deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    valid_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    review_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     goal: Mapped[Goal | None] = relationship(back_populates="decisions")

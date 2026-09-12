@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..access import require_goal, user_goal_ids, user_project_ids
 from ..db import get_db
 from ..deps import current_user
-from ..models import AuditEvent, Commitment, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, Project, ProjectMember, Task, Team, TeamMember, User, Vote
+from ..models import AuditEvent, Commitment, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, Project, ProjectMember, ProposalVersion, Task, Team, TeamMember, User, Vote
 from ..schemas import AuditEventOut, DecisionCreate, DecisionEventCreate, DecisionEventOut, DecisionOut, GoalCreate, GoalOut, MemberCreate, MemberOut, ProblemCreate, ProblemOut, ProjectCreate, ProjectMemberOut, ProjectOut, ProjectStatusUpdate, TaskAssign, TaskCreate, TaskOut, TeamCreate, TeamOut, VoteCreate, VoteOut, VoteSummary
 
 router = APIRouter()
@@ -84,12 +84,13 @@ def list_decisions(db: Db, user: CurrentUser) -> list[Decision]:
 
 @router.post("/decisions", response_model=DecisionOut, status_code=status.HTTP_201_CREATED)
 def create_decision(payload: DecisionCreate, db: Db, user: CurrentUser) -> Decision:
-    if payload.goal_id and not db.get(Goal, payload.goal_id):
-        raise HTTPException(status_code=404, detail="Goal not found")
+    if payload.goal_id:
+        require_goal(db, user.id, payload.goal_id)
     decision = Decision(**payload.model_dump(), author_id=user.id)
     db.add(decision)
     db.flush()
     db.add(DecisionEvent(decision_id=decision.id, author_id=user.id, event_type="proposal", content=payload.proposal))
+    db.add(ProposalVersion(decision_id=decision.id, version=1, content=payload.proposal, author_id=user.id))
     db.commit()
     db.refresh(decision)
     return decision
@@ -116,6 +117,17 @@ def add_decision_event(decision_id: int, payload: DecisionEventCreate, db: Db, u
     db.add(event)
     if payload.event_type in {"accepted", "rejected", "revised"}:
         decision.status = payload.event_type
+    if payload.event_type in {"revision", "revised"}:
+        # A revised proposal is a new immutable version, not an edit.
+        from sqlalchemy import func as sa_func
+
+        next_version = db.scalar(
+            select(sa_func.max(ProposalVersion.version)).where(ProposalVersion.decision_id == decision_id)
+        ) or 0
+        db.add(ProposalVersion(
+            decision_id=decision_id, version=next_version + 1,
+            content=payload.content, author_id=user.id,
+        ))
     db.add(AuditEvent(actor_id=user.id, entity_type="decision", entity_id=decision_id, action=payload.event_type, detail=decision.title))
     db.add(Notification(user_id=user.id, entity_type="decision", entity_id=decision_id, message=f"Decision '{decision.title}' {payload.event_type}"))
     db.commit()
@@ -400,7 +412,14 @@ def finalize_decision(decision_id: int, db: Db, user: CurrentUser) -> Decision:
         raise HTTPException(status_code=400, detail=f"Quorum not met: {len(votes)}/{decision.quorum}")
     accept_count = sum(1 for v in votes if v.variant == "accept")
     reject_count = sum(1 for v in votes if v.variant == "reject")
-    if decision.decision_method == "unanimity":
+    total = len(votes)
+    method = decision.decision_method
+    if method == "unanimity":
+        accepted = reject_count == 0 and accept_count > 0
+    elif method == "supermajority":
+        accepted = accept_count > reject_count and accept_count * 3 >= total * 2
+    elif method == "consent":
+        # Consent: no reasoned objection — zero rejects are required.
         accepted = reject_count == 0 and accept_count > 0
     else:
         # majority; legacy "consensus" rows are counted as what they always were

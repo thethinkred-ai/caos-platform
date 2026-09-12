@@ -5,6 +5,8 @@ previously duplicated across entities.py, search.py and missing in ai.py.
 """
 
 from fastapi import HTTPException
+
+from .errors import DomainError, FORBIDDEN_SCOPE
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -47,5 +49,5 @@ def require_goal(db: Session, user_id: int, goal_id: int) -> Goal:
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
     if goal_id not in user_goal_ids(db, user_id):
-        raise HTTPException(status_code=403, detail="Goal access denied")
+        raise DomainError(403, FORBIDDEN_SCOPE, "Goal access denied")
     return goal

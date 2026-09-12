@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..access import require_goal
 from ..db import get_db
+from ..errors import DomainError, FORBIDDEN_SCOPE, INVALID_STATE_TRANSITION
 from ..deps import current_user
 from ..models import AuditEvent, Commitment, GoalParticipation, Notification, User
 from ..schemas import CommitmentCreate, CommitmentStatusUpdate
@@ -110,13 +111,13 @@ def update_commitment_status(
     if not commitment:
         raise HTTPException(status_code=404, detail="Commitment not found")
     if commitment.user_id != user.id:
-        raise HTTPException(status_code=403, detail="Only the author can update a commitment")
+        raise DomainError(403, FORBIDDEN_SCOPE, "Only the author can update a commitment")
 
     allowed = _STATUS_TRANSITIONS.get(commitment.status, set())
     if payload.status not in allowed:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Cannot move commitment from '{commitment.status}' to '{payload.status}'. Allowed: {sorted(allowed)}",
+        raise DomainError(
+            409, INVALID_STATE_TRANSITION,
+            f"Cannot move commitment from '{commitment.status}' to '{payload.status}'. Allowed: {sorted(allowed)}",
         )
     commitment.status = payload.status
     db.add(AuditEvent(
