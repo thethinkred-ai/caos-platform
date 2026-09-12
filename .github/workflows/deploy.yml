@@ -25,6 +25,28 @@ jobs:
             cd /opt/caos/backend
             source venv/bin/activate
             pip install -r requirements.txt
+
+            # Alembic needs the production DATABASE_URL (the systemd unit
+            # usually injects it; the deploy shell does not).
+            if [ -f /opt/caos/.env ]; then
+              DB_URL=$(grep -E '^DATABASE_URL=' /opt/caos/.env | head -1 | cut -d= -f2- | tr -d "\"'")
+              if [ -n "$DB_URL" ]; then export DATABASE_URL="$DB_URL"; fi
+            fi
+
+            # Best-effort backup before schema migration.
+            if [ -n "$DATABASE_URL" ]; then
+              STAMP=$(date +%Y%m%d_%H%M%S)
+              case "$DATABASE_URL" in
+                sqlite*)
+                  DB_PATH=${DATABASE_URL#sqlite:///}
+                  [ -f "$DB_PATH" ] && cp "$DB_PATH" "$DB_PATH.pre-migration-$STAMP" || true
+                  ;;
+                postgres*)
+                  command -v pg_dump >/dev/null && pg_dump "$DATABASE_URL" > "/opt/caos/backup-pre-migration-$STAMP.sql" || true
+                  ;;
+              esac
+            fi
+
             PYTHONPATH=. python -m alembic upgrade head
             systemctl restart caos-api.service
             sleep 3
