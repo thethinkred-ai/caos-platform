@@ -6,7 +6,7 @@
 
 > **Система, в которой первична цель, а люди временно присоединяются к её достижению.**
 
-🔗 **Фронтенд:** [caos.thinkred.ru](https://caos.thinkred.ru) · **API:** [api-caos.thinkred.ru](https://api-caos.thinkred.ru/docs) · **Проект:** [thinkred.ru](https://thinkred.ru)
+🔗 **Фронтенд:** [caos.thinkred.ru](https://caos.thinkred.ru) · **API:** [api-caos.thinkred.ru](https://api-caos.thinkred.ru) · **Проект:** [thinkred.ru](https://thinkred.ru)
 
 ---
 
@@ -23,6 +23,13 @@
 8. [От кружка к 100 000 человек](https://thinkred.ru/blog/goal-graph-to-scale.html)
 
 Коротко: CAOS заменяет иерархию людей графом целей. Вы не вступаете в организацию — вы присоединяетесь к достижению конкретной цели.
+
+Внутреннее устройство домена описано в документации:
+- [`docs/concept/ontology.md`](docs/concept/ontology.md) — онтология: Problem → Goal → Decision → Participation → Commitment → Activity → Result → Evidence → Verification
+- [`docs/concept/invariants.md`](docs/concept/invariants.md) — инварианты-«конституция», исполняемые тестами
+- [`docs/architecture/domain-model.md`](docs/architecture/domain-model.md) — целевая ER-модель и карта миграции
+- [`docs/plan-caos-0.2.md`](docs/plan-caos-0.2.md) — план улучшений и его выполнение
+- [`CHANGELOG.md`](CHANGELOG.md), [`CURRENT_STATE.md`](CURRENT_STATE.md) — история версий и текущее состояние
 
 ---
 
@@ -49,10 +56,22 @@ docker compose up --build
 
 Откройте:
 - **Фронтенд:** http://localhost:5173
-- **API:** http://localhost:8000
-- **Swagger-документация:** http://localhost:8000/docs
+- **API:** http://localhost:8000/api/v1
+- **Swagger-документация:** http://localhost:8000/docs — включается переменной `DEBUG=true` (в проде выключена; в `.env.example` она по умолчанию `false` — переверните для локальной работы)
 
 > 🔧 Если что-то пошло не так — создайте [Issue](https://github.com/thethinkred-ai/caos-platform/issues/new).
+
+### Локальная разработка без Docker (бэкенд)
+
+```bash
+cd backend
+python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements-dev.txt
+PYTHONPATH=. python -m pytest -q                   # 102 теста
+PYTHONPATH=. python -m uvicorn app.main:app --reload
+```
+
+Схема базы управляется Alembic: `PYTHONPATH=. python -m alembic upgrade head`.
 
 ---
 
@@ -60,27 +79,41 @@ docker compose up --build
 
 ```
 caos-platform/
-├── backend/           # FastAPI (Python)
-│   ├── app/           # Код приложения
-│   │   ├── routers/   # API endpoints
-│   │   ├── models.py  # Модели базы данных
-│   │   └── main.py    # Точка входа
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend/          # React + TypeScript + Vite
-│   ├── src/
-│   │   ├── App.tsx    # Главный компонент
-│   │   └── main.tsx   # Точка входа
-│   └── package.json
+├── backend/                # FastAPI (Python 3.12)
+│   ├── app/
+│   │   ├── routers/        # API: auth, entities, goal_graph, goal_lifecycle,
+│   │   │                   #   goal_participation, commitments, results,
+│   │   │                   #   challenges, links, ai, search, ...
+│   │   ├── models.py       # Модели SQLAlchemy (18+ таблиц)
+│   │   ├── access.py       # Права доступа (что видно)
+│   │   ├── permissions.py  # Матрица capabilities (что можно делать)
+│   │   └── errors.py       # Доменные ошибки с кодами
+│   ├── alembic/            # Миграции (0001–0007)
+│   └── tests/              # 102 теста, включая инварианты INV-1..INV-11
+├── frontend/               # React 19 + TypeScript + Vite
+│   └── src/AppNew.tsx      # Приложение (монолит — реструктуризация в плане, Track F)
+├── docs/                   # Онтология, инварианты, ER-модель, ADR, план
+│   └── adr/                # Архитектурные решения
+├── infrastructure/         # nginx-конфиги
 └── docker-compose.yml
 ```
 
 | Компонент | Технология |
 |-----------|-----------|
-| Бэкенд | Python + FastAPI |
+| Бэкенд | Python + FastAPI + SQLAlchemy 2 |
 | Фронтенд | React + TypeScript + Vite |
-| База данных | PostgreSQL (прод) / SQLite (тесты) |
-| Кеш | Redis |
+| База данных | PostgreSQL (прод, Alembic) / SQLite (тесты) |
+| CI/CD | GitHub Actions: тесты → миграции → деплой на VPS |
+
+### Ключевые механизмы домена
+
+- **Граф целей**: типизированные рёбра `goal_relations` (concretizes / depends_on / supports / conflicts_with / contributes_to / blocks / supersedes) с защитой от циклов и анализом влияния `GET /goals/{id}/impact`.
+- **Жизненный цикл цели**: `draft → proposed → accepted → active → achieved → verified → closed` — только серверными командами; цель с участниками принимается исключительно коллективным решением (`RECOGNITION_REQUIRED`).
+- **Участие и обязательства**: контекстные роли (contributor / coordinator / expert / facilitator / observer) вместо членства в структурах; добровольные обязательства связывают задачи с целями.
+- **Проверяемые результаты**: результат ≠ выполненная задача: `Result → Evidence → Verification`, причём автор результата не может верифицировать его сам.
+- **Возражение как объект**: `Challenge` для целей, решений и результатов — с обязательным записанным ответом.
+- **AI предлагает — люди решают**: каждый ответ AI сохраняется как предложение (модель, снимок входа, confidence) и влияет на домен только после человеческого ревью.
+- **Контракт ошибок**: стабильные машиночитаемые коды (`INVALID_STATE_TRANSITION`, `SELF_VERIFICATION_FORBIDDEN`, …) поверх человекочитаемого `detail`.
 
 ---
 
@@ -105,7 +138,7 @@ caos-platform/
 8. На GitHub нажмите **Contribute** → **Open Pull Request**
 9. Опишите, что изменили, и нажмите **Create Pull Request**
 
-Всё! Мы увидим и обсудим.
+Всё! Мы увидим и обсудим. CI проверит тесты и миграции автоматически.
 
 ---
 
