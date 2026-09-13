@@ -1,22 +1,30 @@
+import logging
+
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 
 from .config import get_settings
 from .db import Base, engine
 from .errors import DomainError
+from .rate_limit import limiter
 from .routers import ai, auth, challenges, commitments, competences, dashboard, delegations, entities, google, goal_graph, goal_lifecycle, goal_participation, knowledge, links, notifications, profile, results, search, stepik
 
 settings = get_settings()
+
+# Basic operational logging: level from settings, timestamps included.
+LOG_LEVEL = "DEBUG" if settings.debug else "INFO"
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+logger = logging.getLogger("caos")
 if settings.database_url.startswith("sqlite"):
     # Dev/test convenience only; production schema is managed by Alembic
     # (create_all cannot evolve existing tables).
     Base.metadata.create_all(bind=engine)
-
-limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title="CAOS API",
@@ -27,6 +35,14 @@ app = FastAPI(
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Log the full traceback server-side; return a generic 500 without
+    internals."""
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Внутренняя ошибка сервера"})
 
 
 @app.exception_handler(DomainError)

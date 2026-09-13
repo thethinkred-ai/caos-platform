@@ -7,14 +7,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
 from ..auth_utils import issue_session, revoke_sessions
 from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
 from ..models import AuditEvent, Session as SessionModel, User, UserProfile
+from ..rate_limit import limiter
 from ..schemas import (
     ChangePasswordRequest, ProfileUpdate, ResetPasswordConfirm,
     ResetPasswordRequest, UserCreate, UserLogin, UserOut,
@@ -29,7 +27,6 @@ from ..security import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
 Db = Annotated[Session, Depends(get_db)]
 
 _REGISTERED_MESSAGE = {"message": "Account created. Check your email for a verification link."}

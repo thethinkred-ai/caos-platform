@@ -45,7 +45,7 @@ app.dependency_overrides[get_db] = _override_get_db
 def client():
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
-    from app.routers.auth import limiter
+    from app.rate_limit import limiter
 
     if hasattr(limiter, "reset"):
         limiter.reset()

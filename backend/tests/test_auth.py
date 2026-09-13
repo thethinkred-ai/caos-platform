@@ -187,3 +187,20 @@ def test_user_out_exposes_privacy_settings(client, outbox):
     me = client.get("/api/v1/auth/me").json()
     assert me["profile_visibility"] == "members"
     assert me["ai_consent"] is True
+
+
+def test_register_rate_limit_enforced(client, outbox):
+    """Six registrations from one address hit the 5/minute limit — proves
+    the single shared limiter is registered on the app (the two-instance
+    bug left limits silently unenforced)."""
+    for i in range(5):
+        response = client.post(
+            "/api/v1/auth/register",
+            json={"email": f"rl{i}@example.com", "password": "strong-password-123", "display_name": f"RL {i}"},
+        )
+        assert response.status_code == 201, (i, response.text)
+    sixth = client.post(
+        "/api/v1/auth/register",
+        json={"email": "rl5@example.com", "password": "strong-password-123", "display_name": "RL 5"},
+    )
+    assert sixth.status_code == 429

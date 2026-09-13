@@ -38,7 +38,7 @@ jobs:
             # old containers keep serving, then recreate the services.
             docker compose -p caos-platform build backend frontend
             docker compose -p caos-platform run --rm --no-deps backend python -m alembic upgrade head
-            docker compose -p caos-platform up -d backend frontend
+            docker compose -p caos-platform up -d --remove-orphans backend frontend
             sleep 5
             curl -fsS http://127.0.0.1:8000/health
             # A v0.2 route must exist (401 = route present, auth required).
