@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
+import { AuthScreen } from "./auth/AuthScreen";
 import { MyActivity } from "./activity/MyActivity";
 import { AuditSection } from "./audit/AuditSection";
+import { CompetencesSection } from "./competences/CompetencesSection";
 import { KnowledgeSection } from "./knowledge/KnowledgeSection";
 import { TeamsSection } from "./teams/TeamsSection";
 import { ProfileSection } from "./profile/ProfileSection";
@@ -51,9 +53,6 @@ export default function AppNew() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [competences, setCompetences] = useState<Competence[]>([]);
-  const [compName, setCompName] = useState("");
-  const [compLevel, setCompLevel] = useState(1);
-  const [compDesc, setCompDesc] = useState("");
   const [projectTasks, setProjectTasks] = useState<Record<number, Task[]>>({});
   const [expandedProjectId, setExpandedProjectId] = useState<number | null>(null);
   const [taskTitle, setTaskTitle] = useState("");
@@ -65,13 +64,9 @@ export default function AppNew() {
   const [decisionGoalId, setDecisionGoalId] = useState("");
   const [eventContent, setEventContent] = useState("");
   const [parentGoalId, setParentGoalId] = useState<number | null>(null);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
-  const [mode, setMode] = useState<"login" | "register">("register");
   const [stepikCourses, setStepikCourses] = useState<{ id: number; title: string; slug: string; url: string; learners_count: number; sections_count: number }[]>([]);
   const [aiRecommendation, setAiRecommendation] = useState<{ goalId: number; suggestion: string; source: string; confidence: number } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -183,30 +178,6 @@ export default function AppNew() {
       .catch(() => {});
   }, []);
 
-  const submitAuth = async (event: FormEvent) => {
-    event.preventDefault();
-    setError("");
-    try {
-      if (mode === "register") {
-        await request<{ message: string }>(`/auth/register`, {
-          method: "POST",
-          body: JSON.stringify({ email, password, display_name: displayName, consent_accepted: true }),
-        });
-        setMode("login");
-        setError("Аккаунт создан. Проверьте email для подтверждения, затем войдите.");
-        return;
-      }
-      const data = await request<{ user: User }>(`/auth/login`, {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      });
-      setUser(data.user);
-      await loadData();
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Ошибка авторизации";
-      setError(message);
-    }
-  };
 
   const createItem = async (event: FormEvent) => {
     event.preventDefault();
@@ -316,31 +287,7 @@ export default function AppNew() {
 
 
 
-  const createCompetence = async (event: FormEvent) => {
-    event.preventDefault();
-    setError("");
-    try {
-      await request("/competences", {
-        method: "POST",
-        body: JSON.stringify({ name: compName, level: compLevel, description: compDesc }),
-      });
-      setCompName("");
-      setCompLevel(1);
-      setCompDesc("");
-      await loadData();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось добавить компетенцию");
-    }
-  };
 
-  const deleteCompetence = async (competenceId: number) => {
-    try {
-      await request(`/competences/${competenceId}`, { method: "DELETE" });
-      await loadData();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка");
-    }
-  };
 
   const loadProjectTasks = async (projectId: number) => {
     if (expandedProjectId === projectId) {
@@ -416,88 +363,13 @@ export default function AppNew() {
 
   if (!user)
     return (
-      <main className="auth-page">
-        <div className="auth-card">
-          <span className="eyebrow">CAOS / MVP 0.1</span>
-          <h1>Деятельность начинается с проблемы.</h1>
-          <p className="muted">
-            Находите общие задачи, формулируйте цели и превращайте их в совместные проекты.
-          </p>
-          <div className="stepik-login-section">
-            <a
-              className="stepik-login-btn"
-              href={`${API_URL}/auth/stepik`}
-            >
-              <span className="stepik-icon">S</span>
-              Войти через Stepik
-            </a>
-            <a
-              className="google-login-btn"
-              href={`${API_URL}/auth/google`}
-            >
-              <span className="google-icon">G</span>
-              Войти через Google
-            </a>
-          </div>
-          <div className="auth-divider"><span>или</span></div>
-          <form onSubmit={submitAuth} className="auth-form">
-            <h2>{mode === "register" ? "Создать аккаунт" : "Войти"}</h2>
-            {mode === "register" && (
-              <input
-                placeholder="Ваше имя"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                required
-                minLength={2}
-              />
-            )}
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <input
-              type="password"
-              placeholder="Пароль (минимум 12 символов)"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={12}
-            />
-            {error && <p className="error">{error}</p>}
-            <button type="submit" className="primary">
-              {mode === "register" ? "Начать работу" : "Войти"}
-            </button>
-            <button
-              type="button"
-              className="link-button"
-              onClick={() => {
-                setMode(mode === "register" ? "login" : "register");
-                setError("");
-              }}
-            >
-              {mode === "register" ? "Уже есть аккаунт? Войти" : "Нет аккаунта? Зарегистрироваться"}
-            </button>
-          </form>
-          <div className="stepik-courses-preview">
-            <h3>Наши курсы на Stepik:</h3>
-            <a className="course-link" href="https://stepik.org/course/288738" target="_blank" rel="noopener">
-              <span className="course-icon">H</span>
-              Наука логики Гегеля
-            </a>
-            <a className="course-link" href="https://stepik.org/course/288774" target="_blank" rel="noopener">
-              <span className="course-icon">K</span>
-              Капитал Маркса
-            </a>
-            <a className="course-link" href="https://stepik.org/course/285340" target="_blank" rel="noopener">
-              <span className="course-icon">L</span>
-              Ленин «Карл Маркс»
-            </a>
-          </div>
-        </div>
-      </main>
+      <AuthScreen
+        notice={error}
+        onAuthenticated={(authenticated) => {
+          setUser(authenticated);
+          void loadData();
+        }}
+      />
     );
 
   const isCatalog = section === "problems" || section === "goals" || section === "projects";
@@ -1069,71 +941,11 @@ export default function AppNew() {
         {section === "audit" && <AuditSection auditEvents={auditEvents} />}
 
         {section === "competences" && (
-          <div className="catalog-layout">
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span className="eyebrow">Навыки</span>
-                  <h2>Добавить компетенцию</h2>
-                </div>
-              </div>
-              <form onSubmit={createCompetence} className="problem-form">
-                <input
-                  placeholder="Название (например, фасилитация)"
-                  value={compName}
-                  onChange={(e) => setCompName(e.target.value)}
-                  required
-                  minLength={2}
-                />
-                <select value={compLevel} onChange={(e) => setCompLevel(Number(e.target.value))}>
-                  <option value={1}>Уровень 1 — новичок</option>
-                  <option value={2}>Уровень 2 — базовый</option>
-                  <option value={3}>Уровень 3 — уверенный</option>
-                  <option value={4}>Уровень 4 — продвинутый</option>
-                  <option value={5}>Уровень 5 — эксперт</option>
-                </select>
-                <textarea
-                  placeholder="Описание (контекст, опыт применения)"
-                  value={compDesc}
-                  onChange={(e) => setCompDesc(e.target.value)}
-                />
-                <button className="primary" type="submit">
-                  Добавить
-                </button>
-              </form>
-              {error && <p className="error">{error}</p>}
-            </section>
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span className="eyebrow">Ваши навыки</span>
-                  <h2>Компетенции</h2>
-                </div>
-                <span className="count">{competences.length}</span>
-              </div>
-              {competences.length === 0 ? (
-                <p className="muted empty">Добавьте первую компетенцию, чтобы отметить свои навыки.</p>
-              ) : (
-                <div className="problem-list">
-                  {competences.map((c) => (
-                    <article key={c.id} className="competence-entry">
-                      <span className="problem-icon">★</span>
-                      <div>
-                        <h3>{c.name}</h3>
-                        {c.description && <p>{c.description}</p>}
-                        <small>
-                          Уровень {c.level}/5 · #{c.id}
-                        </small>
-                        <button className="link-button" onClick={() => deleteCompetence(c.id)}>
-                          Удалить
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
+          <CompetencesSection
+            competences={competences}
+            onReload={loadData}
+            onError={(message) => setError(message)}
+          />
         )}
       </main>
     </div>
