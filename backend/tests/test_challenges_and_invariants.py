@@ -289,3 +289,30 @@ def test_inv11_graph_rejects_forbidden_cycles(client, outbox):
         "target_goal_id": a["id"], "relation_type": "depends_on", "rationale": "Бета ждёт Альфу",
     })
     assert response.status_code == 400
+
+
+def test_proposal_versions_listing_and_access(client, outbox):
+    owner, _ = _user(outbox, "ver@example.com")
+    member, member_user = _user(outbox, "vermember@example.com")
+    goal = _goal(owner, "Цель с версиями")
+    owner.post(f"/api/v1/goals/{goal['id']}/participations", json={"user_id": member_user["id"]})
+
+    decision = owner.post(
+        "/api/v1/decisions",
+        json={"title": "Версионированное решение", "proposal": "Первая редакция", "goal_id": goal["id"]},
+    ).json()
+    owner.post(
+        f"/api/v1/decisions/{decision['id']}/events",
+        json={"event_type": "revision", "content": "Вторая редакция"},
+    )
+
+    versions = owner.get(f"/api/v1/decisions/{decision['id']}/versions")
+    assert versions.status_code == 200
+    body = versions.json()
+    assert [v["version"] for v in body] == [1, 2]
+    assert body[0]["content"] == "Первая редакция"
+
+    # A goal participant can read the versions; an outsider cannot.
+    assert member.get(f"/api/v1/decisions/{decision['id']}/versions").status_code == 200
+    stranger, _ = _user(outbox, "verstranger@example.com")
+    assert stranger.get(f"/api/v1/decisions/{decision['id']}/versions").status_code == 403

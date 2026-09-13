@@ -142,6 +142,16 @@ class DecisionCreate(BaseModel):
     review_at: datetime | None = None
 
 
+class ProposalVersionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    decision_id: int
+    version: int
+    content: str
+    author_id: int
+    created_at: datetime
+
+
 class DecisionEventCreate(BaseModel):
     event_type: str = Field(
         min_length=3,

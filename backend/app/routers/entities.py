@@ -8,7 +8,7 @@ from ..access import require_goal, user_goal_ids, user_project_ids
 from ..db import get_db
 from ..deps import current_user
 from ..models import AuditEvent, Commitment, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, Project, ProjectGoal, ProjectMember, ProposalVersion, Task, Team, TeamMember, User, Vote
-from ..schemas import AuditEventOut, DecisionCreate, DecisionEventCreate, DecisionEventOut, DecisionOut, GoalCreate, GoalOut, MemberCreate, MemberOut, ProblemCreate, ProblemOut, ProjectCreate, ProjectMemberOut, ProjectOut, ProjectStatusUpdate, TaskAssign, TaskCreate, TaskOut, TeamCreate, TeamOut, VoteCreate, VoteOut, VoteSummary
+from ..schemas import AuditEventOut, DecisionCreate, DecisionEventCreate, DecisionEventOut, DecisionOut, GoalCreate, GoalOut, MemberCreate, MemberOut, ProblemCreate, ProblemOut, ProjectCreate, ProjectMemberOut, ProjectOut, ProjectStatusUpdate, TaskAssign, TaskCreate, TaskOut, TeamCreate, TeamOut, ProposalVersionOut, VoteCreate, VoteOut, VoteSummary
 
 router = APIRouter()
 Db = Annotated[Session, Depends(get_db)]
@@ -355,6 +355,22 @@ def list_audit_events(db: Db, user: CurrentUser, skip: int = Query(0, ge=0), lim
         .order_by(AuditEvent.created_at.desc())
         .offset(skip)
         .limit(limit)
+    ))
+
+
+@router.get("/decisions/{decision_id}/versions", response_model=list[ProposalVersionOut])
+def list_proposal_versions(decision_id: int, db: Db, user: CurrentUser) -> list[ProposalVersion]:
+    """What exactly was discussed and accepted at each point in time."""
+    decision = db.get(Decision, decision_id)
+    if not decision:
+        raise HTTPException(status_code=404, detail="Decision not found")
+    if decision.author_id != user.id and not (
+        decision.goal_id and decision.goal_id in user_goal_ids(db, user.id)
+    ):
+        raise HTTPException(status_code=403, detail="Decision access denied")
+    return list(db.scalars(
+        select(ProposalVersion).where(ProposalVersion.decision_id == decision_id)
+        .order_by(ProposalVersion.version)
     ))
 
 

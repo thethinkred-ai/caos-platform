@@ -4,7 +4,7 @@ export type Goal = { id: number; title: string; description: string; status: str
 export type Project = { id: number; title: string; description: string; status: string; goal_id: number | null; owner_id: number; knowledge_count: number };
 
 export type Team = { id: number; name: string; description: string; owner_id: number };
-export type Decision = { id: number; title: string; proposal: string; status: string; goal_id: number | null; author_id: number };
+export type Decision = { id: number; title: string; proposal: string; status: string; goal_id: number | null; author_id: number; decision_method: string; quorum: number; valid_until: string | null; review_at: string | null };
 export type DecisionEvent = { id: number; decision_id: number; author_id: number; event_type: string; content: string; created_at: string };
 export type KnowledgeItem = { id: number; title: string; content: string; project_id: number | null; author_id: number; project_name: string | null; created_at: string };
 export type NextAction = { label: string; section: string; reason: string };
@@ -35,3 +35,7 @@ export type Section = "overview" | "activity" | "problems" | "goals" | "projects
 
 export type ExplainNode = { kind: string; id: number; title: string; status: string; detail: string };
 export type GoalExplain = { goal_id: number; chain: ExplainNode[]; counts: Record<string, number> };
+
+export type VoteOut = { id: number; decision_id: number; user_id: number; variant: string; comment: string; created_at: string };
+export type VoteSummary = { accept: number; reject: number; total: number; quorum: number; quorum_met: boolean; own_vote: VoteOut | null; votes: VoteOut[] | null };
+export type ProposalVersion = { id: number; decision_id: number; version: number; content: string; author_id: number; created_at: string };

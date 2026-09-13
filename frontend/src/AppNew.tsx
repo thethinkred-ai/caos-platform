@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { MyActivity } from "./activity/MyActivity";
+import { DecisionProcess } from "./decisions/DecisionProcess";
 import { useHashRoute } from "./app/useHashRoute";
 import { API_URL, request } from "./api/client";
 import { GoalWorkspace } from "./goal/GoalWorkspace";
@@ -57,6 +58,8 @@ export default function AppNew() {
   const [aiStatus, setAiStatus] = useState<{ llm_available: boolean; model: string | null; base_url: string | null } | null>(null);
   const [selectedDecisionId, setSelectedDecisionId] = useState<number | null>(null);
   const [decisionEvents, setDecisionEvents] = useState<DecisionEvent[]>([]);
+  const [decisionMethod, setDecisionMethod] = useState("majority");
+  const [decisionGoalId, setDecisionGoalId] = useState("");
   const [eventContent, setEventContent] = useState("");
   const [parentGoalId, setParentGoalId] = useState<number | null>(null);
   const [email, setEmail] = useState("");
@@ -233,9 +236,18 @@ export default function AppNew() {
     event.preventDefault();
     setError("");
     try {
-      await request("/decisions", { method: "POST", body: JSON.stringify({ title, proposal: description }) });
+      await request("/decisions", {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          proposal: description,
+          decision_method: decisionMethod,
+          goal_id: decisionGoalId ? Number(decisionGoalId) : null,
+        }),
+      });
       setTitle("");
       setDescription("");
+      setDecisionGoalId("");
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось создать решение");
@@ -1021,6 +1033,20 @@ export default function AppNew() {
                   onChange={(e) => setDescription(e.target.value)}
                   required
                 />
+                <select value={decisionGoalId} onChange={(e) => setDecisionGoalId(e.target.value)}>
+                  <option value="">Без привязки к цели</option>
+                  {goals.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.title}
+                    </option>
+                  ))}
+                </select>
+                <select value={decisionMethod} onChange={(e) => setDecisionMethod(e.target.value)}>
+                  <option value="majority">Большинство</option>
+                  <option value="supermajority">Супербольшинство (2/3)</option>
+                  <option value="unanimity">Единогласие</option>
+                  <option value="consent">Консент (без возражений)</option>
+                </select>
                 <button className="primary" type="submit">
                   Предложить решение
                 </button>
@@ -1056,6 +1082,13 @@ export default function AppNew() {
                     </article>
                   ))}
                 </div>
+              )}
+              {selectedDecisionId && decisions.find((d) => d.id === selectedDecisionId) && user && (
+                <DecisionProcess
+                  decision={decisions.find((d) => d.id === selectedDecisionId)!}
+                  user={user}
+                  onReload={loadData}
+                />
               )}
               {selectedDecisionId && decisionEvents.length > 0 && (
                 <div className="decision-events inline-events">
