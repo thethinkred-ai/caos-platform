@@ -154,6 +154,36 @@ export function DecisionProcess({
                 <b>{ch.claim}</b>
                 <p className="muted">{ch.argument}</p>
                 {ch.resolution && <small>Резолюция: {ch.resolution}</small>}
+                {isAuthor && (ch.status === "open" || ch.status === "acknowledged") && (
+                  <div className="event-buttons" style={{ marginTop: 6 }}>
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        act(() =>
+                          request(`/challenges/${ch.id}/resolve`, {
+                            method: "POST",
+                            body: JSON.stringify({ status: "accepted", resolution: "Возражение принято, предложение будет пересмотрено" }),
+                          }),
+                        )
+                      }
+                    >
+                      Принять
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        act(() =>
+                          request(`/challenges/${ch.id}/resolve`, {
+                            method: "POST",
+                            body: JSON.stringify({ status: "rejected", resolution: "Отклонено с обоснованием" }),
+                          }),
+                        )
+                      }
+                    >
+                      Отклонить
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}

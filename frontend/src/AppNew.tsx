@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { MyActivity } from "./activity/MyActivity";
+import { KnowledgeSection } from "./knowledge/KnowledgeSection";
 import { NotificationsPanel } from "./notifications/NotificationsPanel";
 import { OverviewPanel } from "./overview/OverviewPanel";
 import { DecisionProcess } from "./decisions/DecisionProcess";
@@ -55,8 +56,6 @@ export default function AppNew() {
   const [expandedProjectId, setExpandedProjectId] = useState<number | null>(null);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
-  const [knowledgeProjectId, setKnowledgeProjectId] = useState<number | null>(null);
-  const [knowledgeFilterProjectId, setKnowledgeFilterProjectId] = useState<number | null>(null);
   const [aiStatus, setAiStatus] = useState<{ llm_available: boolean; model: string | null; base_url: string | null } | null>(null);
   const [selectedDecisionId, setSelectedDecisionId] = useState<number | null>(null);
   const [decisionEvents, setDecisionEvents] = useState<DecisionEvent[]>([]);
@@ -256,19 +255,6 @@ export default function AppNew() {
     }
   };
 
-  const createKnowledge = async (event: FormEvent) => {
-    event.preventDefault();
-    setError("");
-    try {
-      await request("/knowledge", { method: "POST", body: JSON.stringify({ title, content: description, project_id: knowledgeProjectId }) });
-      setTitle("");
-      setDescription("");
-      setKnowledgeProjectId(null);
-      await loadData();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось сохранить запись");
-    }
-  };
 
   const doSearch = async (event: FormEvent) => {
     event.preventDefault();
@@ -1134,91 +1120,13 @@ export default function AppNew() {
         )}
 
         {section === "knowledge" && (
-          <div className="catalog-layout">
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span className="eyebrow">Методологическая память</span>
-                  <h2>Новая запись</h2>
-                </div>
-              </div>
-              <form onSubmit={createKnowledge} className="problem-form">
-                <input
-                  placeholder="Название"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                  minLength={3}
-                />
-                <textarea
-                  placeholder="Содержание: опыт, практики, выводы"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  required
-                />
-                <select
-                  value={knowledgeProjectId ?? ""}
-                  onChange={(e) => setKnowledgeProjectId(e.target.value ? Number(e.target.value) : null)}
-                >
-                  <option value="">Без привязки к проекту</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>{p.title}</option>
-                  ))}
-                </select>
-                <button className="primary" type="submit">
-                  Сохранить в базу знаний
-                </button>
-              </form>
-              {error && <p className="error">{error}</p>}
-            </section>
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span className="eyebrow">Коллективный опыт</span>
-                  <h2>База знаний</h2>
-                </div>
-                <span className="count">{knowledge.filter((k) => knowledgeFilterProjectId === null || k.project_id === knowledgeFilterProjectId).length}</span>
-              </div>
-              <div className="knowledge-filter">
-                <select
-                  value={knowledgeFilterProjectId ?? ""}
-                  onChange={(e) => setKnowledgeFilterProjectId(e.target.value ? Number(e.target.value) : null)}
-                >
-                  <option value="">Все записи</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>{p.title}</option>
-                  ))}
-                </select>
-              </div>
-              {knowledge.length === 0 ? (
-                <p className="muted empty">
-                  Записей пока нет. Сохраните первый опыт после завершения проекта.
-                </p>
-              ) : (
-                <div className="problem-list">
-                  {knowledge
-                    .filter((k) => knowledgeFilterProjectId === null || k.project_id === knowledgeFilterProjectId)
-                    .map((item) => (
-                    <article key={item.id}>
-                      <span className="problem-icon">✦</span>
-                      <div>
-                        <h3>{item.title}</h3>
-                        <p>{item.content}</p>
-                        <small>
-                          Знание · #{item.id}
-                          {item.project_name && ` · проект: ${item.project_name}`}
-                          {item.created_at && ` · ${new Date(item.created_at).toLocaleDateString("ru-RU")}`}
-                        </small>
-                      </div>
-                    </article>
-                  ))}
-                  {knowledge.filter((k) => knowledgeFilterProjectId === null || k.project_id === knowledgeFilterProjectId).length === 0 && (
-                    <p className="muted empty">Нет записей для выбранного проекта.</p>
-                  )}
-                </div>
-              )}
-            </section>
-          </div>
+          <KnowledgeSection
+            knowledge={knowledge}
+            projects={projects}
+            goals={goals}
+            onReload={loadData}
+            onError={(message) => setError(message)}
+          />
         )}
 
         {section === "profile" && (

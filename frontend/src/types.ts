@@ -39,3 +39,4 @@ export type GoalExplain = { goal_id: number; chain: ExplainNode[]; counts: Recor
 export type VoteOut = { id: number; decision_id: number; user_id: number; variant: string; comment: string; created_at: string };
 export type VoteSummary = { accept: number; reject: number; total: number; quorum: number; quorum_met: boolean; own_vote: VoteOut | null; votes: VoteOut[] | null };
 export type ProposalVersion = { id: number; decision_id: number; version: number; content: string; author_id: number; created_at: string };
+export type KnowledgeRelation = { id: number; knowledge_id: number; target_type: string; target_id: number; relation_type: string; created_by: number; created_at: string };
