@@ -5,6 +5,7 @@ import {
   EVIDENCE_TYPES,
   GOAL_RELATION_TYPES,
   type Challenge,
+  type Delegation,
   type GoalExplain,
   type Commitment,
   type Evidence,
@@ -71,6 +72,11 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
   const [measurementSource, setMeasurementSource] = useState("");
   const [results, setResults] = useState<ResultItem[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [delegations, setDelegations] = useState<Delegation[]>([]);
+  const [delegRecipient, setDelegRecipient] = useState("");
+  const [delegCapability, setDelegCapability] = useState("coordinate");
+  const [delegReason, setDelegReason] = useState("");
+  const [delegUntil, setDelegUntil] = useState("");
   const [explain, setExplain] = useState<GoalExplain | null>(null);
   const [explainOpen, setExplainOpen] = useState(false);
   const [error, setError] = useState("");
@@ -92,7 +98,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
 
   const reload = useCallback(async () => {
     try {
-      const [goalData, impactData, relationsData, partsData, commitsData, criteriaData, resultsData, challengesData, explainData] =
+      const [goalData, impactData, relationsData, partsData, commitsData, criteriaData, resultsData, challengesData, explainData, delegationsData] =
         await Promise.all([
           request<Goal[]>(`/goals`),
           request<GoalImpact>(`/goals/${goalId}/impact`),
@@ -103,6 +109,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           request<ResultItem[]>(`/goals/${goalId}/results`),
           request<Challenge[]>(`/challenges?target_type=goal&target_id=${goalId}`),
           request<GoalExplain>(`/goals/${goalId}/explain`),
+          request<Delegation[]>(`/goals/${goalId}/delegations`),
         ]);
       setGoal(goalData.find((g) => g.id === goalId) ?? null);
       setImpact(impactData);
@@ -113,6 +120,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
       setResults(resultsData);
       setChallenges(challengesData);
       setExplain(explainData);
+      setDelegations(delegationsData);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки цели");
@@ -237,6 +245,27 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
 
   const verifyResult = (resultId: number, status: string) =>
     act(() => request(`/results/${resultId}/verify`, { method: "POST", body: JSON.stringify({ status, rationale: "Проверено в интерфейсе цели" }) }));
+
+  const createDelegation = () => {
+    if (!delegRecipient || !delegReason.trim() || !delegUntil) return;
+    void act(async () => {
+      await request(`/goals/${goalId}/delegations`, {
+        method: "POST",
+        body: JSON.stringify({
+          recipient_id: Number(delegRecipient),
+          capability: delegCapability,
+          reason: delegReason,
+          valid_until: new Date(delegUntil).toISOString(),
+        }),
+      });
+      setDelegRecipient("");
+      setDelegReason("");
+      setDelegUntil("");
+    });
+  };
+
+  const revokeDelegation = (id: number) =>
+    act(() => request(`/delegations/${id}/revoke`, { method: "POST" }));
 
   const createChallenge = (e: FormEvent) => {
     e.preventDefault();
@@ -575,6 +604,64 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
             Сообщить результат
           </button>
         </form>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">Полномочия</span>
+            <h2>Делегирования</h2>
+          </div>
+          <span className="count">{delegations.filter((d) => d.is_active).length}</span>
+        </div>
+        {delegations.map((d) => (
+          <article key={d.id} style={{ marginBottom: 6 }}>
+            <div>
+              <h3>
+                {d.capability} → {d.recipient_display_name || `#${d.recipient_id}`}
+              </h3>
+              <small>
+                от {d.issuer_display_name || `#${d.issuer_id}`} · до {d.valid_until.slice(0, 10)} ·{" "}
+                <span className="event-type-badge">{d.revoked_at ? "отозвано" : d.is_active ? "активно" : "истекло"}</span>
+              </small>
+              {d.reason && <p className="muted">{d.reason}</p>}
+              {d.is_active && (isOwner || d.issuer_id === user.id) && (
+                <button className="link-button" onClick={() => revokeDelegation(d.id)}>
+                  Отозвать
+                </button>
+              )}
+            </div>
+          </article>
+        ))}
+        {isOwner && (
+          <div className="problem-form" style={{ marginTop: 6 }}>
+            <select value={delegRecipient} onChange={(e) => setDelegRecipient(e.target.value)}>
+              <option value="">Кому…</option>
+              {participations
+                .filter((p) => p.status === "active" && p.user_id !== user.id)
+                .map((p) => (
+                  <option key={p.user_id} value={p.user_id}>
+                    {p.display_name} ({p.role})
+                  </option>
+                ))}
+            </select>
+            <select value={delegCapability} onChange={(e) => setDelegCapability(e.target.value)}>
+              <option value="coordinate">Координация</option>
+              <option value="transition">Переводы цели по циклу</option>
+              <option value="verify_result">Верификация результатов</option>
+            </select>
+            <input
+              type="datetime-local"
+              value={delegUntil}
+              onChange={(e) => setDelegUntil(e.target.value)}
+              required
+            />
+            <input placeholder="Основание (например: отпуск координатора)" value={delegReason} onChange={(e) => setDelegReason(e.target.value)} required minLength={3} />
+            <button className="primary" disabled={busy || !delegRecipient || !delegUntil || !delegReason.trim()} onClick={createDelegation}>
+              Делегировать
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="panel">

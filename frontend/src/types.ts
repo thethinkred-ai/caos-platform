@@ -40,3 +40,4 @@ export type VoteOut = { id: number; decision_id: number; user_id: number; varian
 export type VoteSummary = { accept: number; reject: number; total: number; quorum: number; quorum_met: boolean; own_vote: VoteOut | null; votes: VoteOut[] | null };
 export type ProposalVersion = { id: number; decision_id: number; version: number; content: string; author_id: number; created_at: string };
 export type KnowledgeRelation = { id: number; knowledge_id: number; target_type: string; target_id: number; relation_type: string; created_by: number; created_at: string };
+export type Delegation = { id: number; goal_id: number; issuer_id: number; recipient_id: number; capability: string; reason: string; valid_from: string; valid_until: string; revoked_at: string | null; revoked_by: number | null; created_at: string; recipient_display_name: string; issuer_display_name: string; is_active: boolean };

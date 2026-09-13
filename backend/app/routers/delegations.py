@@ -10,13 +10,13 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, aliased
 
 from ..access import require_goal
 from ..db import get_db
 from ..deps import current_user
-from ..models import AuditEvent, Delegation, Goal, User
+from ..models import AuditEvent, Delegation, Goal, User, UserProfile
 from ..permissions import GOAL_CAPABILITIES, goal_role
 from ..schemas import DelegationCreate, DelegationOut
 
@@ -38,11 +38,30 @@ def _is_active(delegation: Delegation, now: datetime) -> bool:
 
 
 @router.get("/goals/{goal_id}/delegations", response_model=list[DelegationOut])
-def list_delegations(goal_id: int, db: Db, user: CurrentUser) -> list[Delegation]:
+def list_delegations(goal_id: int, db: Db, user: CurrentUser) -> list[dict]:
     require_goal(db, user.id, goal_id)
-    return list(db.scalars(
-        select(Delegation).where(Delegation.goal_id == goal_id).order_by(Delegation.created_at.desc())
-    ))
+    recipient_profile = aliased(UserProfile)
+    issuer_profile = aliased(UserProfile)
+    rows = db.execute(
+        select(
+            Delegation,
+            func.coalesce(recipient_profile.display_name, ""),
+            func.coalesce(issuer_profile.display_name, ""),
+        )
+        .outerjoin(recipient_profile, recipient_profile.user_id == Delegation.recipient_id)
+        .outerjoin(issuer_profile, issuer_profile.user_id == Delegation.issuer_id)
+        .where(Delegation.goal_id == goal_id)
+        .order_by(Delegation.created_at.desc())
+    ).all()
+    now = datetime.now(UTC)
+    result = []
+    for delegation, recipient_name, issuer_name in rows:
+        item = DelegationOut.model_validate(delegation).model_dump(mode="json")
+        item["recipient_display_name"] = recipient_name
+        item["issuer_display_name"] = issuer_name
+        item["is_active"] = _is_active(delegation, now)
+        result.append(item)
+    return result
 
 
 @router.post("/goals/{goal_id}/delegations", response_model=DelegationOut, status_code=status.HTTP_201_CREATED)
