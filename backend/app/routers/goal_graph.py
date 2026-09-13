@@ -16,8 +16,8 @@ from ..access import require_goal
 from ..permissions import require_capability
 from ..db import get_db
 from ..deps import current_user
-from ..models import AuditEvent, Decision, Goal, GoalRelation, Project, User
-from ..schemas import GoalImpact, GoalRelationCreate, GoalRelationOut
+from ..models import AuditEvent, Commitment, Decision, Goal, GoalRelation, Problem, Project, ProjectGoal, Result, Task, User
+from ..schemas import ExplainNode, GoalExplain, GoalImpact, GoalRelationCreate, GoalRelationOut
 
 router = APIRouter()
 Db = Annotated[Session, Depends(get_db)]
@@ -148,3 +148,55 @@ def goal_impact(goal_id: int, db: Db, user: CurrentUser) -> GoalImpact:
         projects=len(list(db.scalars(select(Project.id).where(Project.goal_id == goal_id)))),
         decisions=len(list(db.scalars(select(Decision.id).where(Decision.goal_id == goal_id)))),
     )
+
+
+@router.get("/goals/{goal_id}/explain", response_model=GoalExplain)
+def explain_goal(goal_id: int, db: Db, user: CurrentUser) -> GoalExplain:
+    """The justification chain of a goal: problem -> goal -> decisions ->
+    commitments -> tasks -> results (Track F, critique sections 77/89).
+
+    Answers 'why does this exist?' with facts from the domain graph
+    instead of a chat-bot reconstruction.
+    """
+    goal = require_goal(db, user.id, goal_id)
+
+    chain: list[ExplainNode] = []
+    if goal.problem_id:
+        problem = db.get(Problem, goal.problem_id)
+        if problem:
+            chain.append(ExplainNode(kind="problem", id=problem.id, title=problem.title, status=problem.status, detail=problem.description[:200]))
+    if goal.parent_goal_id:
+        parent = db.get(Goal, goal.parent_goal_id)
+        if parent:
+            chain.append(ExplainNode(kind="goal", id=parent.id, title=parent.title, status=parent.status, detail="родительская цель"))
+
+    decisions = list(db.scalars(select(Decision).where(Decision.goal_id == goal_id).order_by(Decision.created_at)))
+    for d in decisions:
+        chain.append(ExplainNode(kind="decision", id=d.id, title=d.title, status=d.status, detail=d.proposal[:200]))
+
+    commitments = list(db.scalars(select(Commitment).where(Commitment.goal_id == goal_id).order_by(Commitment.created_at)))
+    commitment_ids = [c.id for c in commitments]
+    for c in commitments:
+        chain.append(ExplainNode(kind="commitment", id=c.id, title=c.description[:120], status=c.status, detail=c.expected_result[:200]))
+
+    tasks: list[Task] = []
+    if commitment_ids:
+        tasks = list(db.scalars(select(Task).where(Task.commitment_id.in_(commitment_ids)).order_by(Task.created_at)))
+    project_ids = set(db.scalars(select(Project.id).where(Project.goal_id == goal_id)))
+    project_ids |= set(db.scalars(select(ProjectGoal.project_id).where(ProjectGoal.goal_id == goal_id)))
+    if project_ids:
+        tasks = list(db.scalars(select(Task).where(Task.project_id.in_(project_ids)).order_by(Task.created_at)))
+    for t in tasks:
+        chain.append(ExplainNode(kind="task", id=t.id, title=t.title, status=t.status))
+
+    results = list(db.scalars(select(Result).where(Result.goal_id == goal_id).order_by(Result.created_at)))
+    for r in results:
+        chain.append(ExplainNode(kind="result", id=r.id, title=r.description[:120], status=r.status, detail=r.actual_state[:200]))
+
+    counts = {
+        "decisions": len(decisions),
+        "commitments": len(commitments),
+        "tasks": len(tasks),
+        "results": len(results),
+    }
+    return GoalExplain(goal_id=goal_id, chain=chain, counts=counts)

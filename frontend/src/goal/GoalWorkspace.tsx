@@ -5,6 +5,7 @@ import {
   EVIDENCE_TYPES,
   GOAL_RELATION_TYPES,
   type Challenge,
+  type GoalExplain,
   type Commitment,
   type Evidence,
   type Goal,
@@ -65,6 +66,8 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
   const [criteria, setCriteria] = useState<GoalCriterion[]>([]);
   const [results, setResults] = useState<ResultItem[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [explain, setExplain] = useState<GoalExplain | null>(null);
+  const [explainOpen, setExplainOpen] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -84,7 +87,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
 
   const reload = useCallback(async () => {
     try {
-      const [goalData, impactData, relationsData, partsData, commitsData, criteriaData, resultsData, challengesData] =
+      const [goalData, impactData, relationsData, partsData, commitsData, criteriaData, resultsData, challengesData, explainData] =
         await Promise.all([
           request<Goal[]>(`/goals`),
           request<GoalImpact>(`/goals/${goalId}/impact`),
@@ -94,6 +97,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           request<GoalCriterion[]>(`/goals/${goalId}/criteria`),
           request<ResultItem[]>(`/goals/${goalId}/results`),
           request<Challenge[]>(`/challenges?target_type=goal&target_id=${goalId}`),
+          request<GoalExplain>(`/goals/${goalId}/explain`),
         ]);
       setGoal(goalData.find((g) => g.id === goalId) ?? null);
       setImpact(impactData);
@@ -103,6 +107,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
       setCriteria(criteriaData);
       setResults(resultsData);
       setChallenges(challengesData);
+      setExplain(explainData);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки цели");
@@ -257,6 +262,37 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
         </div>
         {error && <p className="error">{error}</p>}
       </section>
+
+      {explain && explain.chain.length > 0 && (
+        <section className="panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">Обоснование</span>
+              <h2>Почему эта цель существует</h2>
+            </div>
+            <button onClick={() => setExplainOpen(!explainOpen)}>{explainOpen ? "Свернуть" : "Показать цепочку"}</button>
+          </div>
+          {explainOpen ? (
+            <div className="event-timeline">
+              {explain.chain.map((node, i) => (
+                <div key={`${node.kind}-${node.id}-${i}`} className="event-timeline-item">
+                  <span className={`event-type-badge event-type-${node.kind}`}>{node.kind} #{node.id}</span>
+                  <div>
+                    <b>{node.title}</b>
+                    {node.detail && <p className="muted">{node.detail}</p>}
+                    <small>{node.status}</small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">
+              Проблема → решения ({explain.counts.decisions}) → обязательства ({explain.counts.commitments}) → задачи (
+              {explain.counts.tasks}) → результаты ({explain.counts.results}).
+            </p>
+          )}
+        </section>
+      )}
 
       {impact && (
         <section className="panel">

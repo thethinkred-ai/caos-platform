@@ -123,3 +123,46 @@ def test_impact_requires_access(client, outbox):
     register_and_login(stranger, outbox, email="stranger@example.com", display_name="Stranger")
     goal = _goal(owner, "Секретная цель")
     assert stranger.get(f"/api/v1/goals/{goal['id']}/impact").status_code == 403
+
+
+def test_explain_chain_assembles_full_trace(client, outbox):
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    owner, _ = _owner(outbox, "explain@example.com")
+    stranger = TestClient(app)
+    register_and_login(stranger, outbox, email="stranger@example.com", display_name="Stranger")
+
+    problem = owner.post("/api/v1/problems", json={"title": "Нет учебной группы", "description": "d"}).json()
+    goal = owner.post(
+        "/api/v1/goals",
+        json={"title": "Запустить группу", "description": "D", "problem_id": problem["id"]},
+    ).json()
+    decision = owner.post(
+        "/api/v1/decisions",
+        json={"title": "Формат", "proposal": "Еженедельные встречи", "goal_id": goal["id"]},
+    ).json()
+    commitment = owner.post(
+        f"/api/v1/goals/{goal['id']}/commitments",
+        json={"description": "Готовлю программу"},
+    ).json()
+    project = owner.post("/api/v1/projects", json={"title": "Proj", "description": "D", "goal_id": goal["id"]}).json()
+    task = owner.post(
+        f"/api/v1/projects/{project['id']}/tasks", json={"title": "Составить план", "description": ""}
+    ).json()
+    result = owner.post(f"/api/v1/goals/{goal['id']}/results", json={"description": "Группа работает"}).json()
+
+    explain = owner.get(f"/api/v1/goals/{goal['id']}/explain")
+    assert explain.status_code == 200, explain.text
+    body = explain.json()
+    kinds = [(n["kind"], n["id"]) for n in body["chain"]]
+    assert ("problem", problem["id"]) in kinds
+    assert ("decision", decision["id"]) in kinds
+    assert ("commitment", commitment["id"]) in kinds
+    assert ("task", task["id"]) in kinds
+    assert ("result", result["id"]) in kinds
+    assert body["counts"] == {"decisions": 1, "commitments": 1, "tasks": 1, "results": 1}
+
+    # The trace is access-scoped with the goal itself.
+    assert stranger.get(f"/api/v1/goals/{goal['id']}/explain").status_code == 403

@@ -1,7 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { MyActivity } from "./activity/MyActivity";
+import { useHashRoute } from "./app/useHashRoute";
 import { API_URL, request } from "./api/client";
 import { GoalWorkspace } from "./goal/GoalWorkspace";
+import { NewGoalWizard } from "./goal/NewGoalWizard";
 import { OnboardingTour } from "./OnboardingTour";
 import type {
   AuditEvent, Competence, Decision, DecisionEvent, Goal, KnowledgeItem, NextAction,
@@ -25,8 +27,11 @@ const labels: Record<Section, string> = {
 
 export default function AppNew() {
   const [user, setUser] = useState<User | null>(null);
-  const [section, setSection] = useState<Section>("overview");
-  const [workspaceGoalId, setWorkspaceGoalId] = useState<number | null>(null);
+  const [route, navigate] = useHashRoute();
+  const section = route.section;
+  const workspaceGoalId = route.goalId;
+  const goSection = (target: Section) => navigate(target);
+  const goGoal = (goalId: number) => navigate("goals", goalId);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -333,22 +338,7 @@ export default function AppNew() {
     }
   };
 
-  const createGoalWithParent = async (event: FormEvent) => {
-    event.preventDefault();
-    setError("");
-    try {
-      await request("/goals", {
-        method: "POST",
-        body: JSON.stringify({ title, description, parent_goal_id: parentGoalId }),
-      });
-      setTitle("");
-      setDescription("");
-      setParentGoalId(null);
-      await loadData();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось создать цель");
-    }
-  };
+
 
   const createCompetence = async (event: FormEvent) => {
     event.preventDefault();
@@ -554,7 +544,7 @@ export default function AppNew() {
                 key={key}
                 className={section === key ? "active" : ""}
                 onClick={() => {
-                  setSection(key);
+                  goSection(key);
                   setError("");
                 }}
               >
@@ -600,7 +590,7 @@ export default function AppNew() {
                   <span className="eyebrow">Чем помочь сегодня</span>
                   <h2>{nextAction.label}</h2>
                   <p className="muted">{nextAction.reason}</p>
-                  <button className="primary" onClick={() => setSection(nextAction.section as Section)}>
+                  <button className="primary" onClick={() => goSection(nextAction.section as Section)}>
                     Перейти →
                   </button>
                 </div>
@@ -616,15 +606,15 @@ export default function AppNew() {
                   </div>
                 </div>
                 <div className="stats">
-                  <button onClick={() => setSection("problems")}>
+                  <button onClick={() => goSection("problems")}>
                     <strong>{problems.length}</strong>
                     <span>Проблемы</span>
                   </button>
-                  <button onClick={() => setSection("goals")}>
+                  <button onClick={() => goSection("goals")}>
                     <strong>{goals.length}</strong>
                     <span>Цели</span>
                   </button>
-                  <button onClick={() => setSection("projects")}>
+                  <button onClick={() => goSection("projects")}>
                     <strong>{projects.length}</strong>
                     <span>Проекты</span>
                   </button>
@@ -731,7 +721,7 @@ export default function AppNew() {
                 <p className="muted">
                   Проблема помогает найти общую задачу, сформулировать цель и объединить людей вокруг проекта.
                 </p>
-                <button className="primary" onClick={() => setSection("problems")}>
+                <button className="primary" onClick={() => goSection("problems")}>
                   Зафиксировать проблему
                 </button>
               </section>
@@ -760,8 +750,8 @@ export default function AppNew() {
         {section === "activity" && (
         <MyActivity
           onOpenGoal={(id) => {
-            setSection("goals");
-            setWorkspaceGoalId(id);
+            goSection("goals");
+            goGoal(id);
             setError("");
           }}
         />
@@ -771,7 +761,7 @@ export default function AppNew() {
           goalId={workspaceGoalId}
           goals={goals}
           user={user}
-          onBack={() => setWorkspaceGoalId(null)}
+          onBack={() => goSection("goals")}
         />
       )}
       {isCatalog && !(section === "goals" && workspaceGoalId !== null) && (
@@ -786,35 +776,12 @@ export default function AppNew() {
                 </div>
               </div>
               {section === "goals" ? (
-                <form onSubmit={createGoalWithParent} className="problem-form">
-                  <input
-                    placeholder="Название"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                    minLength={3}
-                  />
-                  <textarea
-                    placeholder="Описание"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    required
-                  />
-                  <select
-                    value={parentGoalId ?? ""}
-                    onChange={(e) => setParentGoalId(e.target.value ? Number(e.target.value) : null)}
-                  >
-                    <option value="">Без родительской цели</option>
-                    {goals.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        → {g.title}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="primary" type="submit">
-                    Создать
-                  </button>
-                </form>
+                <NewGoalWizard
+                  problems={problems}
+                  goals={goals}
+                  onCreated={(goalId) => goGoal(goalId)}
+                  onError={(message) => setError(message)}
+                />
               ) : (
                 <form onSubmit={createItem} className="problem-form">
                   <input
@@ -861,7 +828,7 @@ export default function AppNew() {
                         </small>
                         {section === "goals" && (
                           <div className="status-buttons" style={{ marginTop: 6 }}>
-                            <button className="primary" onClick={() => setWorkspaceGoalId(item.id)}>
+                            <button className="primary" onClick={() => goGoal(item.id)}>
                               Открыть рабочее пространство
                             </button>
                           </div>

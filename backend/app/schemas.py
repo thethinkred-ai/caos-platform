@@ -509,3 +509,20 @@ class AISuggestionOut(BaseModel):
 class AISuggestionResolve(BaseModel):
     status: str = Field(min_length=3, max_length=20)
     reason: str = Field(default="", max_length=2000)
+
+
+class ExplainNode(BaseModel):
+    """One step of the justification chain (Track F: explain-this)."""
+    kind: str  # problem / goal / decision / commitment / task / result
+    id: int
+    title: str
+    status: str
+    detail: str = ""
+
+
+class GoalExplain(BaseModel):
+    """Why does this goal exist: the full trace from the problem through
+    decisions, commitments, tasks and results (critique, sections 77/89)."""
+    goal_id: int
+    chain: list[ExplainNode]
+    counts: dict[str, int]

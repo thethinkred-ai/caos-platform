@@ -32,3 +32,6 @@ export type Evidence = { id: number; result_id: number; evidence_type: string; c
 export type Challenge = { id: number; target_type: string; target_id: number; author_id: number; claim: string; argument: string; evidence: string; alternative: string; status: string; resolution: string; created_at: string; resolved_at: string | null };
 
 export type Section = "overview" | "activity" | "problems" | "goals" | "projects" | "teams" | "decisions" | "knowledge" | "profile" | "notifications" | "audit" | "competences";
+
+export type ExplainNode = { kind: string; id: number; title: string; status: string; detail: string };
+export type GoalExplain = { goal_id: number; chain: ExplainNode[]; counts: Record<string, number> };
