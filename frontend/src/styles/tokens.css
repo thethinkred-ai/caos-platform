@@ -1,0 +1,98 @@
+/* CAOS design tokens (critique part two, Step 36).
+   Semantic variables only - components never hardcode colors.
+   Dark mode flips the surfaces via prefers-color-scheme. */
+
+:root {
+  /* surfaces */
+  --background: #f5f7fb;
+  --surface: #ffffff;
+  --surface-alt: #fbfcfe;
+  --surface-muted: #eef1f8;
+
+  /* borders */
+  --border: #dce2ed;
+  --border-subtle: #e6eaf1;
+
+  /* text */
+  --text: #172033;
+  --text-secondary: #2e3856;
+  --text-muted: #8f9bb7;
+
+  --on-primary: #ffffff;
+
+  /* primary */
+  --primary: #536dfe;
+  --primary-strong: #3049d8;
+  --primary-deep: #2940b8;
+  --primary-soft: #eef1ff;
+
+  /* semantic: green means confirmed, red means contested, purple is AI-only */
+  --success: #52c991;
+  --success-soft: #d4f5e0;
+  --danger: #e74c3c;
+  --danger-soft: #fde4e4;
+  --danger-deep: #c23b4a;
+  --warning: #f39c12;
+  --warning-soft: #fef0d6;
+  --ai: #6c5ce7;
+  --ai-soft: #f1eefe;
+
+  /* shadows */
+  --shadow-soft: 0 1px 2px rgba(38, 59, 101, 0.3);
+  --shadow-overlay: 0 8px 24px rgba(17, 24, 39, 0.55);
+
+  /* radii */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* type scale */
+  --font-display: 40px;
+  --font-title: 24px;
+  --font-body: 16px;
+  --font-small: 13px;
+  --font-meta: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #10131c;
+    --surface: #171b28;
+    --surface-alt: #1d2233;
+    --surface-muted: #20263a;
+
+    --border: #2a3147;
+    --border-subtle: #232941;
+
+    --text: #e8eaf2;
+    --text-secondary: #c3c9dc;
+    --text-muted: #7d87a5;
+
+    --on-primary: #ffffff;
+    --primary: #7d92ff;
+    --primary-strong: #536dfe;
+    --primary-deep: #3d55d8;
+    --primary-soft: #232a4d;
+
+    --success: #5fd9a0;
+    --success-soft: #1d3a2b;
+    --danger: #ff6b5e;
+    --danger-soft: #3d2321;
+    --danger-deep: #d94f43;
+    --warning: #f5b942;
+    --warning-soft: #3d2f17;
+    --ai: #9b8cff;
+    --ai-soft: #2a2547;
+
+    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.6);
+  }
+}
