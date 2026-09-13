@@ -172,3 +172,16 @@ def test_sessions_listing_and_revoke(client, outbox):
     response = client.post(f"/api/v1/auth/sessions/{body[0]['id']}/revoke")
     assert response.status_code == 200
     assert client.post("/api/v1/auth/refresh").status_code == 401
+
+
+def test_user_out_exposes_privacy_settings(client, outbox):
+    user = register_and_login(client, outbox, email="privacy@example.com")
+    me = client.get("/api/v1/auth/me").json()
+    assert me["profile_visibility"] == "private"
+    assert me["ai_consent"] is False
+
+    client.patch("/api/v1/profile/visibility", params={"visibility": "members"})
+    client.patch("/api/v1/profile/ai-consent", params={"consent": "true"})
+    me = client.get("/api/v1/auth/me").json()
+    assert me["profile_visibility"] == "members"
+    assert me["ai_consent"] is True

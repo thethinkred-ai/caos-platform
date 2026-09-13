@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { MyActivity } from "./activity/MyActivity";
+import { AuditSection } from "./audit/AuditSection";
 import { KnowledgeSection } from "./knowledge/KnowledgeSection";
+import { TeamsSection } from "./teams/TeamsSection";
 import { ProfileSection } from "./profile/ProfileSection";
 import { NotificationsPanel } from "./notifications/NotificationsPanel";
 import { OverviewPanel } from "./overview/OverviewPanel";
@@ -220,18 +222,6 @@ export default function AppNew() {
     }
   };
 
-  const createTeam = async (event: FormEvent) => {
-    event.preventDefault();
-    setError("");
-    try {
-      await request("/teams", { method: "POST", body: JSON.stringify({ name: title, description }) });
-      setTitle("");
-      setDescription("");
-      await loadData();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось создать команду");
-    }
-  };
 
   const createDecision = async (event: FormEvent) => {
     event.preventDefault();
@@ -939,59 +929,11 @@ export default function AppNew() {
         )}
 
         {section === "teams" && (
-          <div className="catalog-layout">
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span className="eyebrow">Команда</span>
-                  <h2>Новая команда</h2>
-                </div>
-              </div>
-              <form onSubmit={createTeam} className="problem-form">
-                <input
-                  placeholder="Название команды"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                  minLength={2}
-                />
-                <textarea
-                  placeholder="Описание"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-                <button className="primary" type="submit">
-                  Создать команду
-                </button>
-              </form>
-              {error && <p className="error">{error}</p>}
-            </section>
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span className="eyebrow">Ваши команды</span>
-                  <h2>Команды</h2>
-                </div>
-                <span className="count">{teams.length}</span>
-              </div>
-              {teams.length === 0 ? (
-                <p className="muted empty">Создайте первую команду для совместной работы.</p>
-              ) : (
-                <div className="problem-list">
-                  {teams.map((team) => (
-                    <article key={team.id}>
-                      <span className="problem-icon">✦</span>
-                      <div>
-                        <h3>{team.name}</h3>
-                        <p>{team.description || "Описание пока не добавлено."}</p>
-                        <small>Команда · #{team.id}</small>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
+          <TeamsSection
+            teams={teams}
+            onReload={loadData}
+            onError={(message) => setError(message)}
+          />
         )}
 
         {section === "decisions" && (
@@ -1124,37 +1066,7 @@ export default function AppNew() {
           />
         )}
 
-        {section === "audit" && (
-          <div className="catalog-layout">
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span className="eyebrow">Audit trail</span>
-                  <h2>Журнал действий</h2>
-                </div>
-                <span className="count">{auditEvents.length}</span>
-              </div>
-              {auditEvents.length === 0 ? (
-                <p className="muted empty">Записей в журнале пока нет.</p>
-              ) : (
-                <div className="problem-list">
-                  {auditEvents.map((ev) => (
-                    <article key={ev.id} className="audit-entry">
-                      <span className="problem-icon">◇</span>
-                      <div>
-                        <h3>{ev.action}</h3>
-                        <p>{ev.detail}</p>
-                        <small>
-                          {ev.entity_type} #{ev.entity_id} · {new Date(ev.created_at).toLocaleString("ru-RU")}
-                        </small>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
-        )}
+        {section === "audit" && <AuditSection auditEvents={auditEvents} />}
 
         {section === "competences" && (
           <div className="catalog-layout">

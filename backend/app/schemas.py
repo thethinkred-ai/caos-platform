@@ -23,6 +23,8 @@ class UserOut(BaseModel):
     bio: str
     created_at: datetime
     is_verified: bool = True
+    profile_visibility: str = "private"
+    ai_consent: bool = False
 
 
 class TokenOut(BaseModel):

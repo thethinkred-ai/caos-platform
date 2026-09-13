@@ -1,4 +1,4 @@
-export type User = { id: number; email: string; display_name: string; bio: string };
+export type User = { id: number; email: string; display_name: string; bio: string; profile_visibility: string; ai_consent: boolean };
 export type Problem = { id: number; title: string; description: string; status: string; author_id: number };
 export type Goal = { id: number; title: string; description: string; status: string; problem_id: number | null; parent_goal_id: number | null; owner_id: number };
 export type Project = { id: number; title: string; description: string; status: string; goal_id: number | null; owner_id: number; knowledge_count: number };
