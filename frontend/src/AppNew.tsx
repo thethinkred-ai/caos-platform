@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { MyActivity } from "./activity/MyActivity";
+import { NotificationsPanel } from "./notifications/NotificationsPanel";
+import { OverviewPanel } from "./overview/OverviewPanel";
 import { DecisionProcess } from "./decisions/DecisionProcess";
 import { useHashRoute } from "./app/useHashRoute";
 import { API_URL, request } from "./api/client";
@@ -590,7 +592,7 @@ export default function AppNew() {
             <section className="hero">
               <div>
                 <span className="eyebrow">Главный цикл</span>
-                <h2>Проблема → цель → проект → результат</h2>
+                <h2>Положение дел → Проблема → Цель → Действие → Результат</h2>
                 <p>Выберите раздел слева или зафиксируйте проблему, чтобы начать коллективный цикл.</p>
               </div>
               <span className="hero-number">01</span>
@@ -607,6 +609,16 @@ export default function AppNew() {
                   </button>
                 </div>
               </section>
+            )}
+
+            {user && (
+              <OverviewPanel
+                goals={goals}
+                notifications={notifications}
+                auditEvents={auditEvents}
+                onOpenGoal={(id) => goGoal(id)}
+                onGoSection={(target) => goSection(target)}
+              />
             )}
 
             <div className="grid">
@@ -1277,44 +1289,13 @@ export default function AppNew() {
         )}
 
         {section === "notifications" && (
-          <div className="catalog-layout">
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span className="eyebrow">In-app</span>
-                  <h2>Уведомления</h2>
-                </div>
-                {notifications.filter((n) => !n.is_read).length > 0 && (
-                  <button className="link-button" onClick={markAllNotificationsRead}>
-                    Отметить все прочитанными
-                  </button>
-                )}
-              </div>
-              {notifications.length === 0 ? (
-                <p className="muted empty">Уведомлений пока нет.</p>
-              ) : (
-                <div className="problem-list">
-                  {notifications.map((n) => (
-                    <article key={n.id} className={n.is_read ? "read" : ""}>
-                      <span className="problem-icon">!</span>
-                      <div>
-                        <h3>{n.message}</h3>
-                        <small>
-                          {n.entity_type} #{n.entity_id} — {n.is_read ? "прочитано" : "непрочитано"}
-                          {n.created_at && ` · ${new Date(n.created_at).toLocaleString("ru-RU")}`}
-                        </small>
-                        {!n.is_read && (
-                          <button className="link-button" onClick={() => markNotificationRead(n.id)}>
-                            Отметить прочитанным
-                          </button>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
+          <NotificationsPanel
+            notifications={notifications}
+            onOpenGoal={(id) => goGoal(id)}
+            onGoSection={(target) => goSection(target)}
+            onMarkRead={(id) => void markNotificationRead(id)}
+            onMarkAllRead={() => void markAllNotificationsRead()}
+          />
         )}
 
         {section === "audit" && (
