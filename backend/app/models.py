@@ -101,12 +101,35 @@ class Problem(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(200), index=True)
     description: Mapped[str] = mapped_column(Text)
+    current_state: Mapped[str] = mapped_column(Text, default="")
+    scope: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(30), default="open", index=True)
     author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     author: Mapped[User] = relationship(back_populates="problems")
     goals: Mapped[list["Goal"]] = relationship(back_populates="problem")
+    versions: Mapped[list["ProblemVersion"]] = relationship(back_populates="problem", cascade="all, delete-orphan", order_by="ProblemVersion.version")
+
+
+class ProblemVersion(Base):
+    """Immutable versions of a problem formulation (Track D, Step 18):
+    what exactly was recognized as the foundation of a goal at each
+    point in time."""
+
+    __tablename__ = "problem_versions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    problem_id: Mapped[int] = mapped_column(ForeignKey("problems.id"), index=True)
+    version: Mapped[int] = mapped_column(default=1)
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text)
+    current_state: Mapped[str] = mapped_column(Text, default="")
+    scope: Mapped[str] = mapped_column(Text, default="")
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    problem: Mapped[Problem] = relationship(back_populates="versions")
 
 
 class Goal(Base):

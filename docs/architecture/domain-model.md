@@ -44,7 +44,7 @@ erDiagram
 | `users` | разделить | `UserIdentity` (email, пароль, сессии) + `UserProfile` (display_name, bio); email не покидает личных эндпоинтов | D2 |
 | `auth_identities` | оставить | без изменений | — |
 | `sessions` | оставить | без изменений | — |
-| `problems` | расширить | + `situation`, `scope`; этап квалификации (proposed/qualified/rejected/deferred) | C2 |
+| `problems` | расширить | ✅ `current_state`, `scope`, квалификация (qualified/rejected/deferred), версии `problem_versions` | 0010 |
 | `goals` | расширить | + `current_state`, `target_state`, `scope`, `constraints`, `superseded_by`; state machine статусов | C2 |
 | — | добавить | `goal_proposals` (предложение цели до признания) | C2 |
 | — | добавить | `goal_relations` (типизированный граф) | C1 |

@@ -54,6 +54,8 @@ class ResetPasswordConfirm(BaseModel):
 class ProblemCreate(BaseModel):
     title: str = Field(min_length=3, max_length=200)
     description: str = Field(min_length=1, max_length=5000)
+    current_state: str = Field(default="", max_length=2000)
+    scope: str = Field(default="", max_length=2000)
 
 
 class ProblemOut(ProblemCreate):
@@ -62,6 +64,30 @@ class ProblemOut(ProblemCreate):
     status: str
     author_id: int
     created_at: datetime
+
+
+class ProblemUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=3, max_length=200)
+    description: str | None = Field(default=None, min_length=1, max_length=5000)
+    current_state: str | None = Field(default=None, max_length=2000)
+    scope: str | None = Field(default=None, max_length=2000)
+
+
+class ProblemVersionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    problem_id: int
+    version: int
+    title: str
+    description: str
+    current_state: str
+    scope: str
+    author_id: int
+    created_at: datetime
+
+
+class ProblemQualify(BaseModel):
+    status: str = Field(pattern="^(qualified|rejected|deferred)$")
 
 
 class GoalCreate(BaseModel):

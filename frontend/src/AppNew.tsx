@@ -16,7 +16,7 @@ import { NewGoalWizard } from "./goal/NewGoalWizard";
 import { OnboardingTour } from "./OnboardingTour";
 import type {
   AuditEvent, Competence, Decision, DecisionEvent, Goal, KnowledgeItem, NextAction,
-  Notification, Problem, Project, SearchResults, Section, Task, Team, User,
+  Notification, Problem, ProblemVersion, Project, SearchResults, Section, Task, Team, User,
 } from "./types";
 
 const labels: Record<Section, string> = {
@@ -60,6 +60,10 @@ export default function AppNew() {
   const [aiStatus, setAiStatus] = useState<{ llm_available: boolean; model: string | null; base_url: string | null } | null>(null);
   const [selectedDecisionId, setSelectedDecisionId] = useState<number | null>(null);
   const [decisionEvents, setDecisionEvents] = useState<DecisionEvent[]>([]);
+  const [problemState, setProblemState] = useState("");
+  const [problemScope, setProblemScope] = useState("");
+  const [problemVersions, setProblemVersions] = useState<Record<number, ProblemVersion[]>>({});
+  const [expandedProblemId, setExpandedProblemId] = useState<number | null>(null);
   const [decisionMethod, setDecisionMethod] = useState("majority");
   const [decisionGoalId, setDecisionGoalId] = useState("");
   const [eventContent, setEventContent] = useState("");
@@ -184,9 +188,12 @@ export default function AppNew() {
     setError("");
     const endpoint = section === "problems" ? "/problems" : section === "goals" ? "/goals" : "/projects";
     try {
-      await request(endpoint, { method: "POST", body: JSON.stringify({ title, description }) });
+      const extra = section === "problems" ? { current_state: problemState, scope: problemScope } : {};
+      await request(endpoint, { method: "POST", body: JSON.stringify({ title, description, ...extra }) });
       setTitle("");
       setDescription("");
+      setProblemState("");
+      setProblemScope("");
       await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось создать запись");
@@ -346,6 +353,32 @@ export default function AppNew() {
       setProjectTasks((prev) => ({ ...prev, [projectId]: tasks }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось создать задачу");
+    }
+  };
+
+  const toggleProblemVersions = async (problemId: number) => {
+    if (expandedProblemId === problemId) {
+      setExpandedProblemId(null);
+      return;
+    }
+    setExpandedProblemId(problemId);
+    if (problemVersions[problemId] === undefined) {
+      try {
+        const data = await request<ProblemVersion[]>(`/problems/${problemId}/versions`);
+        setProblemVersions((prev) => ({ ...prev, [problemId]: data }));
+      } catch {
+        setProblemVersions((prev) => ({ ...prev, [problemId]: [] }));
+      }
+    }
+  };
+
+  const qualifyProblem = async (problemId: number, status: string) => {
+    setError("");
+    try {
+      await request(`/problems/${problemId}/qualify`, { method: "POST", body: JSON.stringify({ status }) });
+      await loadData();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось квалифицировать");
     }
   };
 
@@ -655,6 +688,20 @@ export default function AppNew() {
                     onChange={(e) => setDescription(e.target.value)}
                     required
                   />
+                  {section === "problems" && (
+                    <>
+                      <input
+                        placeholder="Текущее положение дел (61% завершаемость)"
+                        value={problemState}
+                        onChange={(e) => setProblemState(e.target.value)}
+                      />
+                      <input
+                        placeholder="Чья деятельность затронута"
+                        value={problemScope}
+                        onChange={(e) => setProblemScope(e.target.value)}
+                      />
+                    </>
+                  )}
                   <button className="primary" type="submit">
                     Создать
                   </button>
@@ -684,6 +731,43 @@ export default function AppNew() {
                           {item.status} · #{item.id}
                           {"parent_goal_id" in item && item.parent_goal_id && ` · sub-goal of #${item.parent_goal_id}`}
                         </small>
+                        {section === "problems" && (
+                          <>
+                            <div className="event-buttons" style={{ marginTop: 6 }}>
+                              <button onClick={() => void toggleProblemVersions(item.id)}>
+                                {expandedProblemId === item.id ? "Скрыть историю" : "История формулировки"}
+                              </button>
+                              {item.status === "open" && (
+                                <>
+                                  <button onClick={() => void qualifyProblem(item.id, "qualified")}>
+                                    Квалифицирована
+                                  </button>
+                                  <button onClick={() => void qualifyProblem(item.id, "deferred")}>
+                                    Отложить
+                                  </button>
+                                  <button onClick={() => void qualifyProblem(item.id, "rejected")}>
+                                    Отклонить
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                            {expandedProblemId === item.id && (
+                              <div className="event-timeline" style={{ marginTop: 6 }}>
+                                {(problemVersions[item.id] ?? []).map((v) => (
+                                  <div key={v.id} className="event-timeline-item">
+                                    <span className="event-type-badge">v{v.version}</span>
+                                    <div>
+                                      <b>{v.title}</b>
+                                      <p>{v.description}</p>
+                                      {v.current_state && <small>положение дел: {v.current_state} </small>}
+                                      {v.scope && <small>· охват: {v.scope}</small>}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
                         {section === "goals" && (
                           <div className="status-buttons" style={{ marginTop: 6 }}>
                             <button className="primary" onClick={() => goGoal(item.id)}>

@@ -5,10 +5,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..access import require_goal, user_goal_ids, user_project_ids
+from ..errors import DomainError, INVALID_STATE_TRANSITION
 from ..db import get_db
 from ..deps import current_user
-from ..models import AuditEvent, Commitment, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, Project, ProjectGoal, ProjectMember, ProposalVersion, Task, Team, TeamMember, User, UserProfile, Vote
-from ..schemas import AuditEventOut, DecisionCreate, DecisionEventCreate, DecisionEventOut, DecisionOut, GoalCreate, GoalOut, MemberCreate, MemberOut, ProblemCreate, ProblemOut, ProjectCreate, ProjectMemberOut, ProjectOut, ProjectStatusUpdate, TaskAssign, TaskCreate, TaskOut, TeamCreate, TeamOut, ProposalVersionOut, VoteCreate, VoteOut, VoteSummary
+from ..models import AuditEvent, Commitment, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, ProblemVersion, Project, ProjectGoal, ProjectMember, ProposalVersion, Task, Team, TeamMember, User, UserProfile, Vote
+from ..schemas import AuditEventOut, DecisionCreate, DecisionEventCreate, DecisionEventOut, DecisionOut, GoalCreate, GoalOut, MemberCreate, MemberOut, ProblemCreate, ProblemOut, ProblemQualify, ProblemUpdate, ProblemVersionOut, ProjectCreate, ProjectMemberOut, ProjectOut, ProjectStatusUpdate, TaskAssign, TaskCreate, TaskOut, TeamCreate, TeamOut, ProposalVersionOut, VoteCreate, VoteOut, VoteSummary
 
 router = APIRouter()
 Db = Annotated[Session, Depends(get_db)]
@@ -32,10 +33,77 @@ def create_problem(payload: ProblemCreate, db: Db, user: CurrentUser) -> Problem
     item = Problem(**payload.model_dump(), author_id=user.id)
     db.add(item)
     db.flush()
+    db.add(ProblemVersion(problem_id=item.id, version=1, author_id=user.id, **payload.model_dump()))
     db.add(AuditEvent(actor_id=user.id, entity_type="problem", entity_id=item.id, action="created", detail=item.title))
     db.commit()
     db.refresh(item)
     return item
+
+
+@router.patch("/problems/{problem_id}", response_model=ProblemOut)
+def update_problem(problem_id: int, payload: ProblemUpdate, db: Db, user: CurrentUser) -> Problem:
+    """Every edit creates a new immutable version: the formulation that a
+    goal was founded on stays reconstructable (INV-8)."""
+    problem = db.get(Problem, problem_id)
+    if not problem:
+        raise HTTPException(status_code=404, detail="Problem not found")
+    if problem.author_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the author can edit the problem")
+
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=422, detail="Nothing to update")
+    for field, value in updates.items():
+        setattr(problem, field, value)
+
+    from sqlalchemy import func as sa_func
+
+    next_version = db.scalar(
+        select(sa_func.max(ProblemVersion.version)).where(ProblemVersion.problem_id == problem_id)
+    ) or 0
+    db.add(ProblemVersion(
+        problem_id=problem_id, version=next_version + 1, author_id=user.id,
+        title=problem.title, description=problem.description,
+        current_state=problem.current_state, scope=problem.scope,
+    ))
+    db.add(AuditEvent(actor_id=user.id, entity_type="problem", entity_id=problem_id, action="updated", detail=problem.title))
+    db.commit()
+    db.refresh(problem)
+    return problem
+
+
+@router.get("/problems/{problem_id}/versions", response_model=list[ProblemVersionOut])
+def list_problem_versions(problem_id: int, db: Db, user: CurrentUser) -> list[ProblemVersion]:
+    problem = db.get(Problem, problem_id)
+    if not problem:
+        raise HTTPException(status_code=404, detail="Problem not found")
+    if problem.author_id != user.id:
+        raise HTTPException(status_code=403, detail="Problem access denied")
+    return list(db.scalars(
+        select(ProblemVersion).where(ProblemVersion.problem_id == problem_id).order_by(ProblemVersion.version)
+    ))
+
+
+@router.post("/problems/{problem_id}/qualify", response_model=ProblemOut)
+def qualify_problem(problem_id: int, payload: ProblemQualify, db: Db, user: CurrentUser) -> Problem:
+    """Qualification (critique, Step 11): not every problem must become a
+    goal. Author-driven for now; a collective procedure arrives with
+    governance."""
+    problem = db.get(Problem, problem_id)
+    if not problem:
+        raise HTTPException(status_code=404, detail="Problem not found")
+    if problem.author_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the author can qualify the problem")
+    if problem.status != "open":
+        raise DomainError(
+            409, INVALID_STATE_TRANSITION,
+            f"Problem in status '{problem.status}' cannot be re-qualified",
+        )
+    problem.status = payload.status
+    db.add(AuditEvent(actor_id=user.id, entity_type="problem", entity_id=problem_id, action=payload.status, detail=problem.title))
+    db.commit()
+    db.refresh(problem)
+    return problem
 
 
 @router.get("/goals", response_model=list[GoalOut])

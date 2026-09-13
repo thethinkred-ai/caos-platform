@@ -174,3 +174,51 @@ def test_dashboard_and_audit(client, outbox):
     assert audit.status_code == 200
     actions = {event["action"] for event in audit.json()}
     assert "created" in actions
+
+
+def test_problem_versions_and_qualification(client, outbox):
+    owner, _ = _authed_user(client, outbox, "pv@example.com", "Pavel")
+    stranger, _ = _authed_user(client, outbox, "pvstranger@example.com", "Stranger")
+
+    problem = owner.post(
+        "/api/v1/problems",
+        json={
+            "title": "Участники не доходят до конца курса",
+            "description": "70% бросают на втором модуле",
+            "current_state": "61% завершаемость",
+            "scope": "Учебная деятельность ThinkRed",
+        },
+    )
+    assert problem.status_code == 201, problem.text
+    assert problem.json()["current_state"] == "61% завершаемость"
+    problem_id = problem.json()["id"]
+
+    # Edit creates an immutable v2.
+    updated = owner.patch(
+        f"/api/v1/problems/{problem_id}",
+        json={"description": "68% бросают на втором модуле (данные за сентябрь)"},
+    )
+    assert updated.status_code == 200, updated.text
+
+    versions = owner.get(f"/api/v1/problems/{problem_id}/versions")
+    assert versions.status_code == 200
+    body = versions.json()
+    assert [v["version"] for v in body] == [1, 2]
+    assert body[0]["description"].startswith("70%")
+    assert body[1]["description"].startswith("68%")
+
+    # Versions are author-scoped.
+    assert stranger.get(f"/api/v1/problems/{problem_id}/versions").status_code == 403
+    foreign_edit = stranger.patch(f"/api/v1/problems/{problem_id}", json={"title": "перехват"})
+    assert foreign_edit.status_code == 403
+
+    # Qualification: open -> qualified, then final.
+    qualified = owner.post(f"/api/v1/problems/{problem_id}/qualify", json={"status": "qualified"})
+    assert qualified.status_code == 200
+    assert qualified.json()["status"] == "qualified"
+    again = owner.post(f"/api/v1/problems/{problem_id}/qualify", json={"status": "deferred"})
+    assert again.status_code == 409
+    assert again.json()["code"] == "INVALID_STATE_TRANSITION"
+
+    bad = owner.post(f"/api/v1/problems/{problem_id}/qualify", json={"status": "harness"})
+    assert bad.status_code == 422

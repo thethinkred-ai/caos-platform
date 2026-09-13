@@ -1,5 +1,5 @@
 export type User = { id: number; email: string; display_name: string; bio: string; profile_visibility: string; ai_consent: boolean };
-export type Problem = { id: number; title: string; description: string; status: string; author_id: number };
+export type Problem = { id: number; title: string; description: string; status: string; author_id: number; current_state: string; scope: string };
 export type Goal = { id: number; title: string; description: string; status: string; problem_id: number | null; parent_goal_id: number | null; owner_id: number };
 export type Project = { id: number; title: string; description: string; status: string; goal_id: number | null; owner_id: number; knowledge_count: number };
 
@@ -41,3 +41,4 @@ export type VoteSummary = { accept: number; reject: number; total: number; quoru
 export type ProposalVersion = { id: number; decision_id: number; version: number; content: string; author_id: number; created_at: string };
 export type KnowledgeRelation = { id: number; knowledge_id: number; target_type: string; target_id: number; relation_type: string; created_by: number; created_at: string };
 export type Delegation = { id: number; goal_id: number; issuer_id: number; recipient_id: number; capability: string; reason: string; valid_from: string; valid_until: string; revoked_at: string | null; revoked_by: number | null; created_at: string; recipient_display_name: string; issuer_display_name: string; is_active: boolean };
+export type ProblemVersion = { id: number; problem_id: number; version: number; title: string; description: string; current_state: string; scope: string; author_id: number; created_at: string };
