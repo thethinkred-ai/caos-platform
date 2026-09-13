@@ -310,6 +310,28 @@ class ProposalVersion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class Delegation(Base):
+    """A bounded, time-limited transfer of a capability (Track H1, INV-7).
+
+    Scope is always a concrete goal; the expiry is mandatory; revocation
+    is cheaper than granting. The recipient only gains the capability
+    while the delegation is active — never permanently."""
+
+    __tablename__ = "delegations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    goal_id: Mapped[int] = mapped_column(ForeignKey("goals.id"), index=True)
+    issuer_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    recipient_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    capability: Mapped[str] = mapped_column(String(30))
+    reason: Mapped[str] = mapped_column(Text, default="")
+    valid_from: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    valid_until: Mapped[datetime] = mapped_column(DateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    revoked_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Decision(Base):
     __tablename__ = "decisions"
 

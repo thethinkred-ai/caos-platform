@@ -500,7 +500,7 @@ class VoteSummary(BaseModel):
 
 
 class AISuggestionOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
     id: int
     user_id: int
     endpoint: str
@@ -538,3 +538,25 @@ class GoalExplain(BaseModel):
     goal_id: int
     chain: list[ExplainNode]
     counts: dict[str, int]
+
+
+class DelegationCreate(BaseModel):
+    recipient_id: int
+    capability: str = Field(pattern="^(coordinate|transition|verify_result)$")
+    reason: str = Field(min_length=3, max_length=2000)
+    valid_until: datetime
+
+
+class DelegationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    goal_id: int
+    issuer_id: int
+    recipient_id: int
+    capability: str
+    reason: str
+    valid_from: datetime
+    valid_until: datetime
+    revoked_at: datetime | None = None
+    revoked_by: int | None = None
+    created_at: datetime

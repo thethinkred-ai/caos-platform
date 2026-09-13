@@ -6,12 +6,14 @@ be the sole source of power. Seeing a goal (access.py) and acting on it
 contextual role in the goal, not from a global user.role.
 """
 
+from datetime import UTC, datetime
+
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .errors import DomainError, FORBIDDEN_SCOPE
-from .models import Goal, GoalParticipation, User
+from .models import Delegation, Goal, GoalParticipation, User
 
 # capability -> roles that hold it in the context of a goal
 GOAL_CAPABILITIES: dict[str, set[str]] = {
@@ -47,7 +49,22 @@ def user_can(db: Session, user: User, goal: Goal, capability: str) -> bool:
     if roles is None:
         raise ValueError(f"Unknown capability: {capability}")
     role = goal_role(db, user.id, goal)
-    return role in roles
+    if role in roles:
+        return True
+    # INV-7: an active delegation grants the capability for its scope and
+    # term only — never permanently.
+    now = datetime.now(UTC)
+    delegation = db.scalar(
+        select(Delegation.id).where(
+            Delegation.recipient_id == user.id,
+            Delegation.goal_id == goal.id,
+            Delegation.capability == capability,
+            Delegation.revoked_at.is_(None),
+            Delegation.valid_from <= now,
+            Delegation.valid_until > now,
+        ).limit(1)
+    )
+    return delegation is not None
 
 
 def require_capability(db: Session, user: User, goal: Goal, capability: str) -> None:

@@ -4,12 +4,14 @@ Single source of truth for "which projects/goals can this user touch",
 previously duplicated across entities.py, search.py and missing in ai.py.
 """
 
+from datetime import UTC, datetime
+
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .errors import DomainError, FORBIDDEN_SCOPE
-from .models import Goal, GoalParticipation, Project, ProjectGoal, ProjectMember
+from .models import Delegation, Goal, GoalParticipation, Project, ProjectGoal, ProjectMember
 
 
 def user_project_ids(db: Session, user_id: int) -> set[int]:
@@ -21,9 +23,24 @@ def user_project_ids(db: Session, user_id: int) -> set[int]:
     return owned | member
 
 
+def _active_delegation_goal_ids(db: Session, user_id: int) -> set[int]:
+    """Goals where the user holds an active (in-term, unrevoked)
+    delegation: need-to-act implies need-to-see."""
+    now = datetime.now(UTC)
+    return set(db.scalars(
+        select(Delegation.goal_id).where(
+            Delegation.recipient_id == user_id,
+            Delegation.revoked_at.is_(None),
+            Delegation.valid_from <= now,
+            Delegation.valid_until > now,
+        )
+    ))
+
+
 def user_goal_ids(db: Session, user_id: int) -> set[int]:
-    """Goals the user owns, is a participant of, or that are linked to
-    the user's projects (legacy goal_id and project_goals M2M)."""
+    """Goals the user owns, is a participant of, that are linked to the
+    user's projects (legacy goal_id and project_goals M2M), or where the
+    user holds an active delegation."""
     owned = set(db.scalars(select(Goal.id).where(Goal.owner_id == user_id)))
     project_ids = user_project_ids(db, user_id)
     project_goal_ids: set[int] = set()
@@ -40,7 +57,7 @@ def user_goal_ids(db: Session, user_id: int) -> set[int]:
             GoalParticipation.status == "active",
         )
     ))
-    return owned | project_goal_ids | participated_goal_ids
+    return owned | project_goal_ids | participated_goal_ids | _active_delegation_goal_ids(db, user_id)
 
 
 def require_goal(db: Session, user_id: int, goal_id: int) -> Goal:
