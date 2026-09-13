@@ -296,6 +296,44 @@ class Verification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+ACTIVITY_TYPES = ("task", "meeting", "research", "discussion", "decision", "external_action")
+
+
+class Activity(Base):
+    """An activity form beyond the checkbox (Step 17 p.8): meetings,
+    research, discussions and external actions are activities too, each
+    tied to a goal (optionally via a commitment)."""
+
+    __tablename__ = "activities"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    goal_id: Mapped[int] = mapped_column(ForeignKey("goals.id"), index=True)
+    commitment_id: Mapped[int | None] = mapped_column(ForeignKey("commitments.id"), nullable=True, index=True)
+    activity_type: Mapped[str] = mapped_column(String(30), default="task")
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="planned", index=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class Evaluation(Base):
+    """What a result MEANS relative to the goal/decision (INV: evaluation
+    != verification - verification asks 'did it happen', evaluation asks
+    'what does it teach us'). Insights become knowledge."""
+
+    __tablename__ = "evaluations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    result_id: Mapped[int] = mapped_column(ForeignKey("results.id"), index=True)
+    evaluator_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    conclusion: Mapped[str] = mapped_column(String(40))
+    insight: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Challenge(Base):
     """A structured objection to a significant object — goal, decision or
     result (Track C6). An objection is an object: it cannot be lost, and

@@ -162,7 +162,7 @@ def test_explain_chain_assembles_full_trace(client, outbox):
     assert ("commitment", commitment["id"]) in kinds
     assert ("task", task["id"]) in kinds
     assert ("result", result["id"]) in kinds
-    assert body["counts"] == {"decisions": 1, "commitments": 1, "tasks": 1, "results": 1}
+    assert body["counts"] == {"decisions": 1, "commitments": 1, "tasks": 1, "activities": 0, "results": 1}
 
     # The trace is access-scoped with the goal itself.
     assert stranger.get(f"/api/v1/goals/{goal['id']}/explain").status_code == 403

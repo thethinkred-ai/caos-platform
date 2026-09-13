@@ -16,7 +16,7 @@ from ..access import require_goal
 from ..permissions import require_capability
 from ..db import get_db
 from ..deps import current_user
-from ..models import AuditEvent, Commitment, Decision, Goal, GoalRelation, Problem, Project, ProjectGoal, Result, Task, User
+from ..models import Activity, AuditEvent, Commitment, Decision, Goal, GoalRelation, Problem, Project, ProjectGoal, Result, Task, User
 from ..schemas import ExplainNode, GoalExplain, GoalImpact, GoalRelationCreate, GoalRelationOut
 
 router = APIRouter()
@@ -189,6 +189,10 @@ def explain_goal(goal_id: int, db: Db, user: CurrentUser) -> GoalExplain:
     for t in tasks:
         chain.append(ExplainNode(kind="task", id=t.id, title=t.title, status=t.status))
 
+    activities = list(db.scalars(select(Activity).where(Activity.goal_id == goal_id).order_by(Activity.created_at)))
+    for a in activities:
+        chain.append(ExplainNode(kind="activity", id=a.id, title=a.title[:120], status=a.status, detail=f"тип: {a.activity_type}"))
+
     results = list(db.scalars(select(Result).where(Result.goal_id == goal_id).order_by(Result.created_at)))
     for r in results:
         chain.append(ExplainNode(kind="result", id=r.id, title=r.description[:120], status=r.status, detail=r.actual_state[:200]))
@@ -197,6 +201,7 @@ def explain_goal(goal_id: int, db: Db, user: CurrentUser) -> GoalExplain:
         "decisions": len(decisions),
         "commitments": len(commitments),
         "tasks": len(tasks),
+        "activities": len(activities),
         "results": len(results),
     }
     return GoalExplain(goal_id=goal_id, chain=chain, counts=counts)

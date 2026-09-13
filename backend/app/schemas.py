@@ -586,3 +586,40 @@ class DelegationOut(BaseModel):
     revoked_at: datetime | None = None
     revoked_by: int | None = None
     created_at: datetime
+
+
+class ActivityCreate(BaseModel):
+    activity_type: str = Field(default="task", pattern="^(task|meeting|research|discussion|decision|external_action)$")
+    title: str = Field(min_length=3, max_length=200)
+    description: str = Field(default="", max_length=5000)
+    commitment_id: int | None = None
+
+
+class ActivityOut(ActivityCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    goal_id: int
+    status: str
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    created_by: int
+    created_at: datetime
+
+
+class ActivityStatusUpdate(BaseModel):
+    status: str = Field(pattern="^(in_progress|completed|cancelled)$")
+
+
+class EvaluationCreate(BaseModel):
+    conclusion: str = Field(
+        pattern="^(successful|partially_successful|unsuccessful|decision_correct_implementation_failed|decision_flawed|external_factors)$",
+    )
+    insight: str = Field(default="", max_length=5000)
+
+
+class EvaluationOut(EvaluationCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    result_id: int
+    evaluator_id: int
+    created_at: datetime

@@ -10,7 +10,7 @@ from .config import get_settings
 from .db import Base, engine
 from .errors import DomainError
 from .rate_limit import limiter
-from .routers import ai, auth, challenges, commitments, competences, dashboard, delegations, entities, google, goal_graph, goal_lifecycle, goal_participation, knowledge, links, notifications, profile, results, search, stepik
+from .routers import activities, ai, auth, challenges, commitments, competences, dashboard, delegations, entities, google, goal_graph, goal_lifecycle, goal_participation, knowledge, links, notifications, profile, results, search, stepik
 
 settings = get_settings()
 
@@ -87,6 +87,7 @@ app.include_router(results.router, prefix="/api/v1", tags=["results"])
 app.include_router(challenges.router, prefix="/api/v1", tags=["challenges"])
 app.include_router(links.router, prefix="/api/v1", tags=["links"])
 app.include_router(delegations.router, prefix="/api/v1", tags=["delegations"])
+app.include_router(activities.router, prefix="/api/v1", tags=["activities"])
 app.include_router(search.router, prefix="/api/v1", tags=["search"])
 app.include_router(knowledge.router, prefix="/api/v1", tags=["knowledge"])
 app.include_router(dashboard.router, prefix="/api/v1", tags=["dashboard"])

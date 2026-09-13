@@ -4,8 +4,10 @@ import {
   CRITERION_TYPES,
   EVIDENCE_TYPES,
   GOAL_RELATION_TYPES,
+  type Activity,
   type Challenge,
   type Delegation,
+  type Evaluation,
   type GoalExplain,
   type Commitment,
   type Evidence,
@@ -73,6 +75,13 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
   const [results, setResults] = useState<ResultItem[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [delegations, setDelegations] = useState<Delegation[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activityType, setActivityType] = useState("task");
+  const [activityTitle, setActivityTitle] = useState("");
+  const [evaluations, setEvaluations] = useState<Record<number, Evaluation[]>>({});
+  const [evalFor, setEvalFor] = useState<number | null>(null);
+  const [evalConclusion, setEvalConclusion] = useState("partially_successful");
+  const [evalInsight, setEvalInsight] = useState("");
   const [delegRecipient, setDelegRecipient] = useState("");
   const [delegCapability, setDelegCapability] = useState("coordinate");
   const [delegReason, setDelegReason] = useState("");
@@ -98,7 +107,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
 
   const reload = useCallback(async () => {
     try {
-      const [goalData, impactData, relationsData, partsData, commitsData, criteriaData, resultsData, challengesData, explainData, delegationsData] =
+      const [goalData, impactData, relationsData, partsData, commitsData, criteriaData, resultsData, challengesData, explainData, delegationsData, activitiesData] =
         await Promise.all([
           request<Goal[]>(`/goals`),
           request<GoalImpact>(`/goals/${goalId}/impact`),
@@ -110,6 +119,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           request<Challenge[]>(`/challenges?target_type=goal&target_id=${goalId}`),
           request<GoalExplain>(`/goals/${goalId}/explain`),
           request<Delegation[]>(`/goals/${goalId}/delegations`),
+          request<Activity[]>(`/goals/${goalId}/activities`),
         ]);
       setGoal(goalData.find((g) => g.id === goalId) ?? null);
       setImpact(impactData);
@@ -121,6 +131,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
       setChallenges(challengesData);
       setExplain(explainData);
       setDelegations(delegationsData);
+      setActivities(activitiesData);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки цели");
@@ -266,6 +277,44 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
 
   const revokeDelegation = (id: number) =>
     act(() => request(`/delegations/${id}/revoke`, { method: "POST" }));
+
+  const createActivity = (e: FormEvent) => {
+    e.preventDefault();
+    if (!activityTitle.trim()) return;
+    void act(async () => {
+      await request(`/goals/${goalId}/activities`, {
+        method: "POST",
+        body: JSON.stringify({ activity_type: activityType, title: activityTitle }),
+      });
+      setActivityTitle("");
+    });
+  };
+
+  const advanceActivity = (id: number, next: string) =>
+    act(() => request(`/activities/${id}/status`, { method: "POST", body: JSON.stringify({ status: next }) }));
+
+  const loadEvaluations = async (resultId: number) => {
+    if (evaluations[resultId] !== undefined) return;
+    try {
+      const data = await request<Evaluation[]>(`/results/${resultId}/evaluations`);
+      setEvaluations((prev) => ({ ...prev, [resultId]: data }));
+    } catch {
+      setEvaluations((prev) => ({ ...prev, [resultId]: [] }));
+    }
+  };
+
+  const createEvaluation = (resultId: number) => {
+    void act(async () => {
+      await request(`/results/${resultId}/evaluations`, {
+        method: "POST",
+        body: JSON.stringify({ conclusion: evalConclusion, insight: evalInsight }),
+      });
+      setEvalInsight("");
+      setEvalFor(null);
+      const data = await request<Evaluation[]>(`/results/${resultId}/evaluations`);
+      setEvaluations((prev) => ({ ...prev, [resultId]: data }));
+    });
+  };
 
   const createChallenge = (e: FormEvent) => {
     e.preventDefault();
@@ -594,6 +643,40 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
                   </button>
                 </div>
               )}
+              <div className="event-buttons" style={{ marginTop: 4 }}>
+                <button
+                  onClick={() => {
+                    setEvalFor(evalFor === r.id ? null : r.id);
+                    void loadEvaluations(r.id);
+                  }}
+                >
+                  {evalFor === r.id ? "Скрыть оценки" : "Оценки смысла"}
+                </button>
+              </div>
+              {evalFor === r.id && (
+                <div style={{ marginTop: 6 }}>
+                  {(evaluations[r.id] ?? []).map((ev) => (
+                    <small key={ev.id} style={{ display: "block" }}>
+                      <span className="event-type-badge">{ev.conclusion}</span> {ev.insight}
+                    </small>
+                  ))}
+                  {(evaluations[r.id] ?? []).length === 0 && <p className="muted">Оценок пока нет.</p>}
+                  <div className="problem-form" style={{ marginTop: 4 }}>
+                    <select value={evalConclusion} onChange={(e) => setEvalConclusion(e.target.value)}>
+                      <option value="successful">Цель достигнута</option>
+                      <option value="partially_successful">Частично достигнута</option>
+                      <option value="unsuccessful">Не достигнута</option>
+                      <option value="decision_correct_implementation_failed">Решение верно, исполнение подвело</option>
+                      <option value="decision_flawed">Решение ошибочно</option>
+                      <option value="external_factors">Вмешались внешние факторы</option>
+                    </select>
+                    <input placeholder="Что это значит и чему учит" value={evalInsight} onChange={(e) => setEvalInsight(e.target.value)} />
+                    <button className="primary" disabled={busy} onClick={() => createEvaluation(r.id)}>
+                      Оценить
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </article>
         ))}
@@ -602,6 +685,62 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           <input placeholder="Фактическое состояние (74% завершивших)" value={resultActual} onChange={(e) => setResultActual(e.target.value)} />
           <button className="primary" type="submit" disabled={busy}>
             Сообщить результат
+          </button>
+        </form>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">Деятельность</span>
+            <h2>Формы работы вокруг цели</h2>
+          </div>
+          <span className="count">{activities.length}</span>
+        </div>
+        {activities.map((a) => (
+          <article key={a.id} style={{ marginBottom: 6 }}>
+            <div>
+              <h3>
+                {a.title} <span className="event-type-badge">{a.activity_type}</span>
+              </h3>
+              {a.description && <p className="muted">{a.description}</p>}
+              <small>
+                {a.status} · {a.creator_name}
+                {a.started_at && ` · начата ${a.started_at.slice(0, 10)}`}
+                {a.completed_at && ` · завершена ${a.completed_at.slice(0, 10)}`}
+              </small>
+              {a.created_by === user.id && (a.status === "planned" || a.status === "in_progress") && (
+                <div className="event-buttons" style={{ marginTop: 4 }}>
+                  {a.status === "planned" && (
+                    <button disabled={busy} onClick={() => advanceActivity(a.id, "in_progress")}>
+                      Начать
+                    </button>
+                  )}
+                  {a.status === "in_progress" && (
+                    <button className="primary" disabled={busy} onClick={() => advanceActivity(a.id, "completed")}>
+                      Завершить
+                    </button>
+                  )}
+                  <button disabled={busy} onClick={() => advanceActivity(a.id, "cancelled")}>
+                    Отменить
+                  </button>
+                </div>
+              )}
+            </div>
+          </article>
+        ))}
+        <form onSubmit={createActivity} className="problem-form">
+          <select value={activityType} onChange={(e) => setActivityType(e.target.value)}>
+            <option value="task">Задача</option>
+            <option value="meeting">Встреча</option>
+            <option value="research">Исследование</option>
+            <option value="discussion">Обсуждение</option>
+            <option value="decision">Решение</option>
+            <option value="external_action">Внешнее действие</option>
+          </select>
+          <input placeholder="Название деятельности" value={activityTitle} onChange={(e) => setActivityTitle(e.target.value)} required minLength={3} />
+          <button className="primary" type="submit" disabled={busy}>
+            Добавить
           </button>
         </form>
       </section>
