@@ -1,25 +1,16 @@
 import { FormEvent, useEffect, useState } from "react";
+import { MyActivity } from "./activity/MyActivity";
+import { API_URL, request } from "./api/client";
+import { GoalWorkspace } from "./goal/GoalWorkspace";
 import { OnboardingTour } from "./OnboardingTour";
+import type {
+  AuditEvent, Competence, Decision, DecisionEvent, Goal, KnowledgeItem, NextAction,
+  Notification, Problem, Project, SearchResults, Section, Task, Team, User,
+} from "./types";
 
-type User = { id: number; email: string; display_name: string; bio: string };
-type Problem = { id: number; title: string; description: string; status: string; author_id: number };
-type Goal = { id: number; title: string; description: string; status: string; problem_id: number | null; parent_goal_id: number | null; owner_id: number };
-type Project = { id: number; title: string; description: string; status: string; goal_id: number | null; owner_id: number; knowledge_count: number };
-
-type Team = { id: number; name: string; description: string; owner_id: number };
-type Decision = { id: number; title: string; proposal: string; status: string; goal_id: number | null; author_id: number };
-type DecisionEvent = { id: number; decision_id: number; author_id: number; event_type: string; content: string; created_at: string };
-type KnowledgeItem = { id: number; title: string; content: string; project_id: number | null; author_id: number; project_name: string | null; created_at: string };
-type NextAction = { label: string; section: string; reason: string };
-type Notification = { id: number; user_id: number; entity_type: string; entity_id: number; message: string; is_read: boolean; created_at: string };
-type AuditEvent = { id: number; actor_id: number; entity_type: string; entity_id: number; action: string; detail: string; created_at: string };
-type Competence = { id: number; user_id: number; name: string; level: number; description: string; created_at: string };
-type Task = { id: number; title: string; description: string; status: string; project_id: number; assignee_id: number | null; assignee_name: string | null; created_at: string };
-type SearchResults = { problems: Problem[]; goals: Goal[]; projects: Project[]; knowledge: KnowledgeItem[]; decisions: Decision[] };
-type Section = "overview" | "problems" | "goals" | "projects" | "teams" | "decisions" | "knowledge" | "profile" | "notifications" | "audit" | "competences";
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 const labels: Record<Section, string> = {
   overview: "Обзор",
+  activity: "Моя деятельность",
   problems: "Проблемы",
   goals: "Цели",
   projects: "Проекты",
@@ -32,35 +23,10 @@ const labels: Record<Section, string> = {
   competences: "Компетенции",
 };
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(`${API_URL}${path}`, {
-      ...options,
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-    });
-  } catch (error) {
-    if (error instanceof TypeError) throw new Error("API недоступен. Запустите backend на порту 8000.");
-    throw error;
-  }
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const error = new Error(body.detail ?? "Не удалось выполнить запрос") as Error & { code?: string };
-    error.code = body.code; // stable machine-readable code from the backend (Track E2)
-    throw error;
-  }
-  if (response.status === 204) return undefined as T;
-  const text = await response.text();
-  return (text ? JSON.parse(text) : undefined) as T;
-}
-
 export default function AppNew() {
   const [user, setUser] = useState<User | null>(null);
   const [section, setSection] = useState<Section>("overview");
+  const [workspaceGoalId, setWorkspaceGoalId] = useState<number | null>(null);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -791,7 +757,24 @@ export default function AppNew() {
           </>
         )}
 
-        {isCatalog && (
+        {section === "activity" && (
+        <MyActivity
+          onOpenGoal={(id) => {
+            setSection("goals");
+            setWorkspaceGoalId(id);
+            setError("");
+          }}
+        />
+      )}
+      {section === "goals" && workspaceGoalId !== null && user && (
+        <GoalWorkspace
+          goalId={workspaceGoalId}
+          goals={goals}
+          user={user}
+          onBack={() => setWorkspaceGoalId(null)}
+        />
+      )}
+      {isCatalog && !(section === "goals" && workspaceGoalId !== null) && (
           <div className="catalog-layout">
             <section className="panel">
               <div className="panel-heading">
@@ -876,6 +859,13 @@ export default function AppNew() {
                           {item.status} · #{item.id}
                           {"parent_goal_id" in item && item.parent_goal_id && ` · sub-goal of #${item.parent_goal_id}`}
                         </small>
+                        {section === "goals" && (
+                          <div className="status-buttons" style={{ marginTop: 6 }}>
+                            <button className="primary" onClick={() => setWorkspaceGoalId(item.id)}>
+                              Открыть рабочее пространство
+                            </button>
+                          </div>
+                        )}
                         {section === "goals" && (
                           <div className="ai-section">
                             <div className="ai-buttons">
