@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { MyActivity } from "./activity/MyActivity";
 import { KnowledgeSection } from "./knowledge/KnowledgeSection";
+import { ProfileSection } from "./profile/ProfileSection";
 import { NotificationsPanel } from "./notifications/NotificationsPanel";
 import { OverviewPanel } from "./overview/OverviewPanel";
 import { DecisionProcess } from "./decisions/DecisionProcess";
@@ -45,7 +46,6 @@ export default function AppNew() {
   const [nextAction, setNextAction] = useState<NextAction | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
-  const [bio, setBio] = useState("");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [competences, setCompetences] = useState<Competence[]>([]);
@@ -268,20 +268,6 @@ export default function AppNew() {
     }
   };
 
-  const updateProfile = async (event: FormEvent) => {
-    event.preventDefault();
-    setError("");
-    try {
-      const updated = await request<User>("/auth/me", {
-        method: "PATCH",
-        body: JSON.stringify({ display_name: displayName, bio }),
-      });
-      setUser(updated);
-      setBio("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось обновить профиль");
-    }
-  };
 
   const loadDecisionEvents = async (decisionId: number) => {
     setSelectedDecisionId(decisionId);
@@ -1129,80 +1115,12 @@ export default function AppNew() {
           />
         )}
 
-        {section === "profile" && (
-          <div className="catalog-layout">
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span className="eyebrow">Аккаунт</span>
-                  <h2>Редактировать профиль</h2>
-                </div>
-              </div>
-              <form onSubmit={updateProfile} className="problem-form">
-                <input
-                  placeholder="Отображаемое имя"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  required
-                  minLength={2}
-                />
-                <textarea placeholder="О себе (био)" value={bio} onChange={(e) => setBio(e.target.value)} />
-                <button className="primary" type="submit">
-                  Сохранить
-                </button>
-              </form>
-              {error && <p className="error">{error}</p>}
-            </section>
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span className="eyebrow">Текущие данные</span>
-                  <h2>Профиль</h2>
-                </div>
-              </div>
-              <div className="profile-info">
-                <p>
-                  <strong>Имя:</strong> {user.display_name}
-                </p>
-                <p>
-                  <strong>Email:</strong> {user.email}
-                </p>
-                <p>
-                  <strong>Био:</strong> {user.bio || "Не заполнено"}
-                </p>
-              </div>
-            </section>
-            {stepikCourses.length > 0 && (
-              <section className="panel">
-                <div className="panel-heading">
-                  <div>
-                    <span className="eyebrow">Stepik</span>
-                    <h2>Наши курсы</h2>
-                  </div>
-                </div>
-                <div className="stepik-courses-list">
-                  {stepikCourses.map((c) => (
-                    <a key={c.id} className="course-link" href={c.url} target="_blank" rel="noopener">
-                      <span className="course-icon">{c.slug[0].toUpperCase()}</span>
-                      <div>
-                        <div>{c.title}</div>
-                        <div className="course-meta">{c.learners_count} студентов · {c.sections_count} разделов</div>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
-        )}
-
-        {section === "notifications" && (
-          <NotificationsPanel
-            notifications={notifications}
-            onOpenGoal={(id) => goGoal(id)}
-            onGoSection={(target) => goSection(target)}
-            onMarkRead={(id) => void markNotificationRead(id)}
-            onMarkAllRead={() => void markAllNotificationsRead()}
+        {section === "profile" && user && (
+          <ProfileSection
+            user={user}
+            stepikCourses={stepikCourses}
+            onUpdated={(updated) => setUser(updated)}
+            onError={(message) => setError(message)}
           />
         )}
 

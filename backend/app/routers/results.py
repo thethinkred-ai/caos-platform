@@ -72,6 +72,19 @@ def record_measurement(criterion_id: int, payload: GoalMeasurementCreate, db: Db
     return measurement
 
 
+@router.get("/criteria/{criterion_id}/measurements", response_model=list[GoalMeasurementOut])
+def list_measurements(criterion_id: int, db: Db, user: CurrentUser) -> list[GoalMeasurement]:
+    """Criterion dynamics: baseline -> ... -> actual over time."""
+    criterion = db.get(GoalCriterion, criterion_id)
+    if not criterion:
+        raise HTTPException(status_code=404, detail="Criterion not found")
+    require_goal(db, user.id, criterion.goal_id)
+    return list(db.scalars(
+        select(GoalMeasurement).where(GoalMeasurement.criterion_id == criterion_id)
+        .order_by(GoalMeasurement.measured_at)
+    ))
+
+
 # --- results & evidence ---
 
 

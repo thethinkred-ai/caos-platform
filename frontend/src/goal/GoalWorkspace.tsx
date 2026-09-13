@@ -11,6 +11,7 @@ import {
   type Goal,
   type GoalCriterion,
   type GoalImpact,
+  type GoalMeasurement,
   type GoalParticipation,
   type GoalRelation,
   type ResultItem,
@@ -64,6 +65,10 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
   const [participations, setParticipations] = useState<GoalParticipation[]>([]);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [criteria, setCriteria] = useState<GoalCriterion[]>([]);
+  const [measurements, setMeasurements] = useState<Record<number, GoalMeasurement[]>>({});
+  const [measurementFor, setMeasurementFor] = useState<number | null>(null);
+  const [measurementValue, setMeasurementValue] = useState("");
+  const [measurementSource, setMeasurementSource] = useState("");
   const [results, setResults] = useState<ResultItem[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [explain, setExplain] = useState<GoalExplain | null>(null);
@@ -118,6 +123,22 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
     void reload();
   }, [reload]);
 
+  // Criterion dynamics: fetch measurement history once criteria are known.
+  useEffect(() => {
+    void (async () => {
+      for (const criterion of criteria) {
+        if (measurements[criterion.id] !== undefined) continue;
+        try {
+          const data = await request<GoalMeasurement[]>(`/criteria/${criterion.id}/measurements`);
+          setMeasurements((prev) => ({ ...prev, [criterion.id]: data }));
+        } catch {
+          setMeasurements((prev) => ({ ...prev, [criterion.id]: [] }));
+        }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [criteria]);
+
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     setError("");
@@ -171,6 +192,21 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
       });
       setCriterionName("");
       setCriterionTarget("");
+    });
+  };
+
+  const recordMeasurement = (criterionId: number) => {
+    if (!measurementValue.trim()) return;
+    void act(async () => {
+      await request(`/criteria/${criterionId}/measurements`, {
+        method: "POST",
+        body: JSON.stringify({ value: measurementValue, source: measurementSource }),
+      });
+      setMeasurementValue("");
+      setMeasurementSource("");
+      setMeasurementFor(null);
+      const data = await request<GoalMeasurement[]>(`/criteria/${criterionId}/measurements`);
+      setMeasurements((prev) => ({ ...prev, [criterionId]: data }));
     });
   };
 
@@ -441,7 +477,9 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           <p className="muted empty">Критериев нет — цель непроверяема.</p>
         ) : (
           <div className="problem-list">
-            {criteria.map((c) => (
+            {criteria.map((c) => {
+              const history = measurements[c.id] ?? [];
+              return (
               <article key={c.id}>
                 <span className="problem-icon">≡</span>
                 <div>
@@ -451,9 +489,29 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
                   <small>
                     {c.baseline && `базовая: ${c.baseline} → `}цель: {c.target_value} {c.unit}
                   </small>
+                  {history.length > 0 && (
+                    <small style={{ display: "block" }}>
+                      динамика: {history.map((m) => m.value).join(" → ")}
+                    </small>
+                  )}
+                  <div className="event-buttons" style={{ marginTop: 4 }}>
+                    <button onClick={() => setMeasurementFor(measurementFor === c.id ? null : c.id)}>
+                      {measurementFor === c.id ? "Отмена" : "Записать измерение"}
+                    </button>
+                  </div>
+                  {measurementFor === c.id && (
+                    <div className="problem-form" style={{ marginTop: 6 }}>
+                      <input placeholder="Значение (74%)" value={measurementValue} onChange={(e) => setMeasurementValue(e.target.value)} />
+                      <input placeholder="Источник (аналитика курса)" value={measurementSource} onChange={(e) => setMeasurementSource(e.target.value)} />
+                      <button className="primary" disabled={busy || !measurementValue.trim()} onClick={() => recordMeasurement(c.id)}>
+                        Записать
+                      </button>
+                    </div>
+                  )}
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
         )}
         <form onSubmit={createCriterion} className="problem-form">

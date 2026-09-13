@@ -172,3 +172,25 @@ def test_results_require_goal_access(client, outbox):
         f"/api/v1/goals/{goal['id']}/results",
         json={"description": "Чужой результат"},
     ).status_code == 403
+
+
+def test_measurement_history_listing(client, outbox):
+    owner, _ = _user(outbox, "meas@example.com")
+    goal = _goal(owner, "Цель с динамикой")
+    criterion = owner.post(
+        f"/api/v1/goals/{goal['id']}/criteria",
+        json={"name": "Доля завершивших", "criterion_type": "quantitative", "target_value": "78%"},
+    ).json()
+
+    for value in ("65%", "70%", "74%"):
+        assert owner.post(
+            f"/api/v1/criteria/{criterion['id']}/measurements",
+            json={"value": value, "source": "analytics"},
+        ).status_code == 201
+
+    history = owner.get(f"/api/v1/criteria/{criterion['id']}/measurements")
+    assert history.status_code == 200
+    assert [m["value"] for m in history.json()] == ["65%", "70%", "74%"]
+
+    stranger, _ = _user(outbox, "measstranger@example.com")
+    assert stranger.get(f"/api/v1/criteria/{criterion['id']}/measurements").status_code == 403
