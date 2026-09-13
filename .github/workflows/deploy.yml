@@ -1,6 +1,8 @@
 name: Deploy to VPS
 
 # Deploy only after CI has passed on main — never deploy red builds.
+# The production runtime is Docker Compose (project "caos-platform");
+# the venv/systemd path was a leftover that never served traffic.
 on:
   workflow_run:
     workflows: ["CAOS CI"]
@@ -12,7 +14,7 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy backend to VPS
+      - name: Deploy backend to VPS (Docker runtime)
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -22,36 +24,23 @@ jobs:
             set -e
             cd /opt/caos
             git pull origin main
-            cd /opt/caos/backend
-            source venv/bin/activate
-            pip install -r requirements.txt
 
-            # Alembic needs the production DATABASE_URL (the systemd unit
-            # usually injects it; the deploy shell does not).
-            if [ -f /opt/caos/.env ]; then
-              DB_URL=$(grep -E '^DATABASE_URL=' /opt/caos/.env | head -1 | cut -d= -f2- | tr -d "\"'")
-              if [ -n "$DB_URL" ]; then export DATABASE_URL="$DB_URL"; fi
-            fi
+            # Backup the running database before any schema change
+            # (pg_dump inside the db container - no host credentials needed).
+            STAMP=$(date +%Y%m%d_%H%M%S)
+            docker compose -p caos-platform exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' \
+              > "/opt/caos/backup-pre-migration-$STAMP.sql"
+            test -s "/opt/caos/backup-pre-migration-$STAMP.sql" || { echo "backup is empty, aborting"; exit 1; }
 
-            # Best-effort backup before schema migration.
-            if [ -n "$DATABASE_URL" ]; then
-              STAMP=$(date +%Y%m%d_%H%M%S)
-              case "$DATABASE_URL" in
-                sqlite*)
-                  DB_PATH=${DATABASE_URL#sqlite:///}
-                  [ -f "$DB_PATH" ] && cp "$DB_PATH" "$DB_PATH.pre-migration-$STAMP" || true
-                  ;;
-                postgres*)
-                  command -v pg_dump >/dev/null && pg_dump "$DATABASE_URL" > "/opt/caos/backup-pre-migration-$STAMP.sql" || true
-                  ;;
-              esac
-            fi
-
-            PYTHONPATH=. python -m alembic upgrade head
-            systemctl restart caos-api.service
-            sleep 3
-            systemctl is-active caos-api.service
+            # Build the new image, migrate via a one-off container while the
+            # old containers keep serving, then recreate the services.
+            docker compose -p caos-platform build backend frontend
+            docker compose -p caos-platform run --rm --no-deps backend python -m alembic upgrade head
+            docker compose -p caos-platform up -d backend frontend
+            sleep 5
             curl -fsS http://127.0.0.1:8000/health
+            # A v0.2 route must exist (401 = route present, auth required).
+            curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/goals/1/impact | grep -q 401
 
   deploy-frontend:
     if: github.event.workflow_run.conclusion == 'success'
