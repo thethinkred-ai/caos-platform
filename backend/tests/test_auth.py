@@ -177,7 +177,7 @@ def test_sessions_listing_and_revoke(client, outbox):
 
 
 def test_user_out_exposes_privacy_settings(client, outbox):
-    user = register_and_login(client, outbox, email="privacy@example.com")
+    register_and_login(client, outbox, email="privacy@example.com")
     me = client.get("/api/v1/auth/me").json()
     assert me["profile_visibility"] == "private"
     assert me["ai_consent"] is False

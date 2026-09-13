@@ -2,12 +2,10 @@
 
 from fastapi.testclient import TestClient
 
-from app.main import app
 from tests.conftest import register_and_login
 
 
 def _two_users(outbox):
-    from fastapi.testclient import TestClient
 
     from app.main import app as main_app
 

@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { AIProposalsPanel } from "./ai/AIProposalsPanel";
 import { AuthScreen } from "./auth/AuthScreen";
 import { MyActivity } from "./activity/MyActivity";
 import { AuditSection } from "./audit/AuditSection";
@@ -477,6 +478,8 @@ export default function AppNew() {
                 </div>
               </section>
             )}
+
+            {user && <AIProposalsPanel />}
 
             {user && (
               <OverviewPanel

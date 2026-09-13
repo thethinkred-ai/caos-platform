@@ -41,7 +41,7 @@ def mark_notification_read(notification_id: int, db: Db, user: CurrentUser) -> N
 def mark_all_read(db: Db, user: CurrentUser) -> dict[str, int]:
     result = db.execute(
         update(Notification)
-        .where(Notification.user_id == user.id, Notification.is_read == False)
+        .where(Notification.user_id == user.id, Notification.is_read.is_(False))
         .values(is_read=True)
     )
     db.commit()

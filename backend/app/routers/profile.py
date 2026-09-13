@@ -41,7 +41,7 @@ def get_profile(user_id: int, db: Db, user: CurrentUser) -> dict:
     projects = list(db.scalars(select(Project).where(Project.owner_id == user_id).limit(50)))
     decisions = list(db.scalars(select(Decision).where(Decision.author_id == user_id).limit(50)))
     competences = list(db.scalars(
-        select(Competence).where(Competence.user_id == user_id, Competence.is_visible == True)
+        select(Competence).where(Competence.user_id == user_id, Competence.is_visible.is_(True))
     ))
 
     assigned_tasks = list(db.scalars(select(Task).where(Task.assignee_id == user_id, Task.status != "done").limit(20)))

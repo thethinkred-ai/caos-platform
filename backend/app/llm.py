@@ -1,6 +1,5 @@
 """OpenAI-compatible LLM adapter with stub fallback."""
 
-import json
 import logging
 
 import httpx

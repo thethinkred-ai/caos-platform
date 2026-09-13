@@ -135,7 +135,7 @@ def refresh_token(request: Request, db: Db) -> JSONResponse:
         user_id, jti = decode_refresh_token(refresh)
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
-    session = db.scalar(select(SessionModel).where(SessionModel.jti == jti, SessionModel.revoked == False))
+    session = db.scalar(select(SessionModel).where(SessionModel.jti == jti, SessionModel.revoked.is_(False)))
     if not session:
         raise HTTPException(status_code=401, detail="Session revoked or not found")
     session.revoked = True
@@ -234,7 +234,7 @@ def reset_password_confirm(payload: ResetPasswordConfirm, db: Db) -> JSONRespons
 
 @router.get("/me/export")
 def export_user_data(db: Db, user: Annotated[User, Depends(current_user)]) -> JSONResponse:
-    from ..models import Problem, Goal, Project, Decision, KnowledgeItem, Competence, Task, TeamMember, ProjectMember
+    from ..models import Problem, Goal, Project, Decision, KnowledgeItem, Competence
     data = {
         "user": UserOut.model_validate(user).model_dump(),
         "problems": [{"id": p.id, "title": p.title, "description": p.description, "status": p.status, "created_at": str(p.created_at)} for p in db.scalars(select(Problem).where(Problem.author_id == user.id))],

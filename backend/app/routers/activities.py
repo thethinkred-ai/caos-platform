@@ -17,7 +17,7 @@ from ..db import get_db
 from ..deps import current_user
 from ..errors import DomainError, FORBIDDEN_SCOPE, INVALID_STATE_TRANSITION
 from ..models import Activity, AuditEvent, Evaluation, Result, User
-from ..schemas import ActivityCreate, ActivityOut, ActivityStatusUpdate, EvaluationCreate, EvaluationOut
+from ..schemas import ActivityCreate, ActivityStatusUpdate, EvaluationCreate, EvaluationOut
 
 router = APIRouter()
 Db = Annotated[Session, Depends(get_db)]

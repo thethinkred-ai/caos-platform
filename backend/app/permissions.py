@@ -8,7 +8,6 @@ contextual role in the goal, not from a global user.role.
 
 from datetime import UTC, datetime
 
-from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 

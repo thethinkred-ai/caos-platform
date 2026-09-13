@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..access import require_goal
 from ..db import get_db
-from ..errors import DomainError, FORBIDDEN_SCOPE, RESULT_ALREADY_VERIFIED, SELF_VERIFICATION_FORBIDDEN
+from ..errors import DomainError, RESULT_ALREADY_VERIFIED, SELF_VERIFICATION_FORBIDDEN
 from ..permissions import require_capability
 from ..deps import current_user
 from ..models import AuditEvent, Evidence, GoalCriterion, GoalMeasurement, Notification, Result, User, Verification

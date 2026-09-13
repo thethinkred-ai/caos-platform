@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -112,7 +112,7 @@ def _stub_decompose_goal(db: Session, user: User, goal_id: int) -> AIRecommendat
 
 
 def _llm_similar_problems(db: Session, user: User, problem_id: int) -> AIRecommendation:
-    _require_own_problem(db, user, problem_id)
+    problem = _require_own_problem(db, user, problem_id)
     others = list(db.scalars(
         select(Problem).where(Problem.author_id == user.id, Problem.id != problem_id).limit(10)
     ))
@@ -132,7 +132,7 @@ def _llm_similar_people(db: Session, user: User) -> AIRecommendation:
         return AIRecommendation(suggestion="AI-анализ требует согласия на обработку данных. Включите AI-согласие в настройках профиля.", source="consent_required", confidence=0.0)
     answer = llm_complete_sync(
         SYSTEM_PROMPT,
-        f"Пользователь интересуется коллективной деятельностью. Подскажи, как найти единомышленников для совместной работы над проблемами и целями.",
+        "Пользователь интересуется коллективной деятельностью. Подскажи, как найти единомышленников для совместной работы над проблемами и целями.",
     )
     if not answer:
         return _stub_similar_people(db, user)
@@ -220,16 +220,16 @@ def _llm_similar_goals(db: Session, user: User, goal_id: int) -> AIRecommendatio
     return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
 
 
-def _llm_duplicate_goals(db: Session, user: User, goal_id: int) -> AIRecommendation:
-    goal = require_goal(db, user.id, goal_id)
-    others = _other_visible_goals(db, user, goal_id)
-
-
 def _other_visible_goals(db: Session, user: User, goal_id: int) -> list[Goal]:
     goal_ids = user_goal_ids(db, user.id) - {goal_id}
     if not goal_ids:
         return []
     return list(db.scalars(select(Goal).where(Goal.id.in_(goal_ids)).limit(10)))
+
+
+def _llm_duplicate_goals(db: Session, user: User, goal_id: int) -> AIRecommendation:
+    goal = require_goal(db, user.id, goal_id)
+    others = _other_visible_goals(db, user, goal_id)
     context = f"Цель: {goal.title}\nОписание: {goal.description}\n\nДругие цели:\n"
     context += "\n".join(f"- {g.title}: {g.description[:80]}" for g in others) or "Нет других целей."
     answer = llm_complete_sync(
@@ -352,7 +352,7 @@ def match_people_to_task(task_id: int, db: Db, user: CurrentUser) -> list[dict]:
     )) | {project.owner_id}
     matches = []
     for uid in member_ids:
-        comps = list(db.scalars(select(Competence).where(Competence.user_id == uid, Competence.is_visible == True)))
+        comps = list(db.scalars(select(Competence).where(Competence.user_id == uid, Competence.is_visible.is_(True))))
         matched = [c for c in comps if any(req.lower() in c.name.lower() for req in requirements)]
         if matched:
             u = db.get(User, uid)
@@ -442,7 +442,7 @@ def goal_conflicts(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
 def mentoring(db: Db, user: CurrentUser) -> AIRecommendation:
     if not user.ai_consent:
         return AIRecommendation(suggestion="AI-анализ требует согласия на обработку данных.", source="consent_required", confidence=0.0)
-    comps = list(db.scalars(select(Competence).where(Competence.user_id == user.id, Competence.is_visible == True)))
+    comps = list(db.scalars(select(Competence).where(Competence.user_id == user.id, Competence.is_visible.is_(True))))
     if is_llm_available() and comps:
         context = "\n".join(f"- {c.name} (уровень {c.level})" for c in comps)
         answer = llm_complete_sync(

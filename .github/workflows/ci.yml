@@ -17,6 +17,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements-dev.txt
+      - run: ruff check .
       - run: PYTHONPATH=. python -m pytest -q
       - name: Migrations smoke (fresh DB)
         run: DATABASE_URL=sqlite:///ci_mig.db PYTHONPATH=. python -m alembic upgrade head

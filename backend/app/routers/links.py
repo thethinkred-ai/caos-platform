@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 from ..access import require_goal
 from ..db import get_db
 from ..deps import current_user
-from ..models import AuditEvent, Goal, KnowledgeItem, KnowledgeRelation, Project, ProjectGoal, User
+from ..models import AuditEvent, KnowledgeItem, KnowledgeRelation, Project, ProjectGoal, ProjectMember, User
 from ..schemas import (
-    KnowledgeOut, KnowledgeRelationCreate, KnowledgeRelationOut,
+    KnowledgeRelationCreate, KnowledgeRelationOut,
     ProjectGoalCreate, ProjectGoalOut,
 )
 
