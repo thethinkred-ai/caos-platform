@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { request } from "../api/client";
-import type { Commitment, Goal } from "../types";
+import type { Commitment, Competence, Goal } from "../types";
 
 const STATUS_LABELS: Record<string, string> = {
   open: "взято",
@@ -15,14 +15,23 @@ const STATUS_LABELS: Record<string, string> = {
 export function MyActivity({ onOpenGoal }: { onOpenGoal?: (goalId: number) => void }) {
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [competences, setCompetences] = useState<Competence[]>([]);
+  const [evidenceFor, setEvidenceFor] = useState<number | null>(null);
+  const [evidenceCompetenceId, setEvidenceCompetenceId] = useState("");
+  const [evidenceNote, setEvidenceNote] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(async () => {
     try {
-      const [mine, goalData] = await Promise.all([request<Commitment[]>("/commitments/my"), request<Goal[]>("/goals")]);
+      const [mine, goalData, competenceData] = await Promise.all([
+        request<Commitment[]>("/commitments/my"),
+        request<Goal[]>("/goals"),
+        request<Competence[]>("/competences"),
+      ]);
       setCommitments(mine);
       setGoals(goalData);
+      setCompetences(competenceData);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки");
@@ -40,6 +49,29 @@ export function MyActivity({ onOpenGoal }: { onOpenGoal?: (goalId: number) => vo
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Действие не удалось");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const recordEvidence = async (commitmentId: number) => {
+    if (!evidenceCompetenceId) return;
+    setBusy(true);
+    try {
+      await request(`/competences/${evidenceCompetenceId}/evidence`, {
+        method: "POST",
+        body: JSON.stringify({
+          source_type: "commitment_fulfilled",
+          source_id: commitmentId,
+          note: evidenceNote,
+        }),
+      });
+      setEvidenceFor(null);
+      setEvidenceNote("");
+      setEvidenceCompetenceId("");
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Не удалось записать опыт");
     } finally {
       setBusy(false);
     }
@@ -121,6 +153,33 @@ export function MyActivity({ onOpenGoal }: { onOpenGoal?: (goalId: number) => vo
                   <h3>
                     {c.description} <span className="event-type-badge">{STATUS_LABELS[c.status] ?? c.status}</span>
                   </h3>
+                  {c.status === "fulfilled" && (
+                    <>
+                      <button className="link-button" onClick={() => setEvidenceFor(evidenceFor === c.id ? null : c.id)}>
+                        Записать как опыт
+                      </button>
+                      {evidenceFor === c.id && (
+                        <div className="problem-form" style={{ marginTop: 6 }}>
+                          <select value={evidenceCompetenceId} onChange={(e) => setEvidenceCompetenceId(e.target.value)}>
+                            <option value="">Компетенция…</option>
+                            {competences.map((k) => (
+                              <option key={k.id} value={k.id}>
+                                {k.name} (ур. {k.level})
+                              </option>
+                            ))}
+                          </select>
+                          <input placeholder="Что именно практиковалось" value={evidenceNote} onChange={(e) => setEvidenceNote(e.target.value)} />
+                          <button
+                            className="primary"
+                            disabled={busy || !evidenceCompetenceId}
+                            onClick={() => void recordEvidence(c.id)}
+                          >
+                            Подтвердить практикой
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </article>
             ))}

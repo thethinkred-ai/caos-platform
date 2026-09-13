@@ -10,7 +10,7 @@ export type KnowledgeItem = { id: number; title: string; content: string; projec
 export type NextAction = { label: string; section: string; reason: string };
 export type Notification = { id: number; user_id: number; entity_type: string; entity_id: number; message: string; is_read: boolean; created_at: string };
 export type AuditEvent = { id: number; actor_id: number; entity_type: string; entity_id: number; action: string; detail: string; created_at: string };
-export type Competence = { id: number; user_id: number; name: string; level: number; description: string; created_at: string };
+export type Competence = { id: number; user_id: number; name: string; level: number; description: string; created_at: string; evidence_count: number };
 export type Task = { id: number; title: string; description: string; status: string; project_id: number; assignee_id: number | null; assignee_name: string | null; commitment_id: number | null; created_at: string };
 export type SearchResults = { problems: Problem[]; goals: Goal[]; projects: Project[]; knowledge: KnowledgeItem[]; decisions: Decision[] };
 

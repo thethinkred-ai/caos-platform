@@ -623,3 +623,17 @@ class EvaluationOut(EvaluationCreate):
     result_id: int
     evaluator_id: int
     created_at: datetime
+
+
+class CompetenceEvidenceCreate(BaseModel):
+    source_type: str = Field(pattern="^(commitment_fulfilled|result_verified)$")
+    source_id: int
+    note: str = Field(default="", max_length=2000)
+
+
+class CompetenceEvidenceOut(CompetenceEvidenceCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    user_id: int
+    competence_id: int
+    created_at: datetime

@@ -584,6 +584,23 @@ class Competence(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class CompetenceEvidence(Base):
+    """Practice-based proof of a competence (Step 30): a fulfilled
+    commitment or a verified result recorded against the skill it
+    exercised. A competence backed by evidence is no longer
+    self-declared."""
+
+    __tablename__ = "competence_evidence"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    competence_id: Mapped[int] = mapped_column(ForeignKey("competences.id"), index=True)
+    source_type: Mapped[str] = mapped_column(String(30))  # commitment_fulfilled / result_verified
+    source_id: Mapped[int] = mapped_column()
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Vote(Base):
     __tablename__ = "votes"
     __table_args__ = (UniqueConstraint("decision_id", "user_id", name="uq_vote_decision_user"),)
