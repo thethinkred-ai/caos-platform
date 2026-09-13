@@ -9,14 +9,14 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..access import require_goal
 from ..permissions import require_capability
 from ..db import get_db
 from ..deps import current_user
-from ..models import AuditEvent, GoalParticipation, User
+from ..models import AuditEvent, GoalParticipation, User, UserProfile
 from ..schemas import GoalParticipationCreate, GoalParticipationRoleUpdate
 
 router = APIRouter()
@@ -43,8 +43,8 @@ def _participation_payload(p: GoalParticipation, display_name: str) -> dict:
 def list_participations(goal_id: int, db: Db, user: CurrentUser) -> list[dict]:
     require_goal(db, user.id, goal_id)
     rows = db.execute(
-        select(GoalParticipation, User.display_name)
-        .join(User, User.id == GoalParticipation.user_id)
+        select(GoalParticipation, func.coalesce(UserProfile.display_name, ""))
+        .outerjoin(UserProfile, UserProfile.user_id == GoalParticipation.user_id)
         .where(GoalParticipation.goal_id == goal_id)
         .order_by(GoalParticipation.joined_at)
     ).all()

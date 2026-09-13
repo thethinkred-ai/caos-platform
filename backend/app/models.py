@@ -12,8 +12,6 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    display_name: Mapped[str] = mapped_column(String(120))
-    bio: Mapped[str] = mapped_column(Text, default="")
     stepik_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     verification_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
@@ -23,12 +21,52 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), default="member")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    profile: Mapped["UserProfile | None"] = relationship(back_populates="user", uselist=False)
     problems: Mapped[list["Problem"]] = relationship(back_populates="author")
     projects: Mapped[list["Project"]] = relationship(back_populates="owner")
     teams: Mapped[list["TeamMember"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     project_memberships: Mapped[list["ProjectMember"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     decisions: Mapped[list["Decision"]] = relationship(back_populates="author")
     auth_identities: Mapped[list["AuthIdentity"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+    # Identity data lives in UserProfile (D2); these compatibility
+    # properties keep every existing read and write site working.
+    @property
+    def display_name(self) -> str:
+        return self.profile.display_name if self.profile else ""
+
+    @display_name.setter
+    def display_name(self, value: str) -> None:
+        if self.profile is None:
+            self.profile = UserProfile(display_name=value, bio="")
+        else:
+            self.profile.display_name = value
+
+    @property
+    def bio(self) -> str:
+        return self.profile.bio if self.profile else ""
+
+    @bio.setter
+    def bio(self, value: str) -> None:
+        if self.profile is None:
+            self.profile = UserProfile(display_name="", bio=value)
+        else:
+            self.profile.bio = value
+
+
+class UserProfile(Base):
+    """Profile data of a user (D2): what others may see, separated from
+    the identity row (email, password) that stays strictly protected."""
+
+    __tablename__ = "user_profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True)
+    display_name: Mapped[str] = mapped_column(String(120), default="")
+    bio: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="profile")
 
 
 class AuthIdentity(Base):

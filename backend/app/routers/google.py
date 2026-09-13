@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from ..auth_utils import issue_session
 from ..config import get_settings
 from ..db import get_db
-from ..models import AuthIdentity, AuditEvent, User
+from ..models import AuthIdentity, AuditEvent, User, UserProfile
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -107,10 +107,10 @@ def google_callback(code: str | None = None, state: str | None = None, request: 
                 user = User(
                     email=email,
                     password_hash=None,
-                    display_name=display_name,
                     stepik_id=None,
                     is_verified=True,
                 )
+                user.profile = UserProfile(display_name=display_name, bio="")
                 db.add(user)
                 db.flush()
                 db.add(AuthIdentity(provider="google", provider_subject=google_id, user_id=user.id, verified_email=True))

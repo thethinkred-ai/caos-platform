@@ -8,14 +8,14 @@ this part of the goal", as opposed to an assigned task.
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..access import require_goal
 from ..db import get_db
 from ..errors import DomainError, FORBIDDEN_SCOPE, INVALID_STATE_TRANSITION
 from ..deps import current_user
-from ..models import AuditEvent, Commitment, GoalParticipation, Notification, User
+from ..models import AuditEvent, Commitment, GoalParticipation, Notification, User, UserProfile
 from ..schemas import CommitmentCreate, CommitmentStatusUpdate
 
 router = APIRouter()
@@ -84,8 +84,8 @@ def create_commitment(goal_id: int, payload: CommitmentCreate, db: Db, user: Cur
 def list_goal_commitments(goal_id: int, db: Db, user: CurrentUser) -> list[dict]:
     require_goal(db, user.id, goal_id)
     rows = db.execute(
-        select(Commitment, User.display_name)
-        .join(User, User.id == Commitment.user_id)
+        select(Commitment, func.coalesce(UserProfile.display_name, ""))
+        .outerjoin(UserProfile, UserProfile.user_id == Commitment.user_id)
         .where(Commitment.goal_id == goal_id)
         .order_by(Commitment.created_at.desc())
     ).all()
@@ -95,8 +95,8 @@ def list_goal_commitments(goal_id: int, db: Db, user: CurrentUser) -> list[dict]
 @router.get("/commitments/my")
 def my_commitments(db: Db, user: CurrentUser) -> list[dict]:
     rows = db.execute(
-        select(Commitment, User.display_name)
-        .join(User, User.id == Commitment.user_id)
+        select(Commitment, func.coalesce(UserProfile.display_name, ""))
+        .outerjoin(UserProfile, UserProfile.user_id == Commitment.user_id)
         .where(Commitment.user_id == user.id)
         .order_by(Commitment.created_at.desc())
     ).all()

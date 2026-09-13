@@ -14,7 +14,7 @@ from ..auth_utils import issue_session, revoke_sessions
 from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
-from ..models import AuditEvent, Session as SessionModel, User
+from ..models import AuditEvent, Session as SessionModel, User, UserProfile
 from ..schemas import (
     ChangePasswordRequest, ProfileUpdate, ResetPasswordConfirm,
     ResetPasswordRequest, UserCreate, UserLogin, UserOut,
@@ -81,11 +81,11 @@ def register(payload: UserCreate, request: Request, db: Db) -> JSONResponse:
     user = User(
         email=email,
         password_hash=hash_password(payload.password),
-        display_name=payload.display_name,
         is_verified=False,
         verification_token=token_hash,
         consent_accepted_at=datetime.now(UTC),
     )
+    user.profile = UserProfile(display_name=payload.display_name, bio="")
     db.add(user)
     try:
         db.commit()

@@ -69,10 +69,12 @@ def test_verify_token_cannot_reset_password(client, outbox):
 def test_password_login_for_oauth_only_account_is_401_not_500(client):
     # OAuth accounts have password_hash=None — verify_password must not crash.
     from tests.conftest import TestingSessionLocal
-    from app.models import User
+    from app.models import User, UserProfile
 
     db = TestingSessionLocal()
-    db.add(User(email="google-only@example.com", password_hash=None, display_name="G", is_verified=True))
+    oauth_user = User(email="google-only@example.com", password_hash=None, is_verified=True)
+    oauth_user.profile = UserProfile(display_name="G", bio="")
+    db.add(oauth_user)
     db.commit()
     db.close()
 

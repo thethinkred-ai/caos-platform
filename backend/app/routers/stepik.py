@@ -13,7 +13,7 @@ from ..auth_utils import issue_session
 from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
-from ..models import AuditEvent, AuthIdentity, User
+from ..models import AuditEvent, AuthIdentity, User, UserProfile
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -113,10 +113,10 @@ def stepik_callback(code: str | None = None, state: str | None = None, request: 
                     user = User(
                         email=email,
                         password_hash=None,
-                        display_name=display_name,
                         stepik_id=stepik_id,
                         is_verified=True,
                     )
+                    user.profile = UserProfile(display_name=display_name, bio="")
                     db.add(user)
                     db.flush()
             db.add(AuthIdentity(provider="stepik", provider_subject=str(stepik_id), user_id=user.id, verified_email=True))

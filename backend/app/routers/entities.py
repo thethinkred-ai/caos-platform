@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..access import require_goal, user_goal_ids, user_project_ids
 from ..db import get_db
 from ..deps import current_user
-from ..models import AuditEvent, Commitment, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, Project, ProjectGoal, ProjectMember, ProposalVersion, Task, Team, TeamMember, User, Vote
+from ..models import AuditEvent, Commitment, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, Project, ProjectGoal, ProjectMember, ProposalVersion, Task, Team, TeamMember, User, UserProfile, Vote
 from ..schemas import AuditEventOut, DecisionCreate, DecisionEventCreate, DecisionEventOut, DecisionOut, GoalCreate, GoalOut, MemberCreate, MemberOut, ProblemCreate, ProblemOut, ProjectCreate, ProjectMemberOut, ProjectOut, ProjectStatusUpdate, TaskAssign, TaskCreate, TaskOut, TeamCreate, TeamOut, ProposalVersionOut, VoteCreate, VoteOut, VoteSummary
 
 router = APIRouter()
@@ -270,8 +270,9 @@ def list_tasks(project_id: int, db: Db, user: CurrentUser) -> list[dict]:
     if project.owner_id != user.id and not db.scalar(select(ProjectMember).where(ProjectMember.project_id == project_id, ProjectMember.user_id == user.id)):
         raise HTTPException(status_code=403, detail="Project membership required")
     rows = db.execute(
-        select(Task, User.display_name)
+        select(Task, func.coalesce(UserProfile.display_name, ""))
         .outerjoin(User, User.id == Task.assignee_id)
+        .outerjoin(UserProfile, UserProfile.user_id == User.id)
         .where(Task.project_id == project_id)
         .order_by(Task.created_at)
     ).all()
