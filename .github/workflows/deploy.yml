@@ -1,8 +1,10 @@
 name: Deploy to VPS
 
-# Deploy only after CI has passed on main — never deploy red builds.
-# The production runtime is Docker Compose (project "caos-platform");
-# the venv/systemd path was a leftover that never served traffic.
+# Deploy only after CI has passed on main - never deploy red builds.
+# The production runtime is Docker Compose (project "caos-platform"):
+# backend AND frontend ship as rebuilt containers. The legacy TimeWeb
+# FTP mirror was removed - its credentials were compromised and rotated;
+# the public DNS currently still points at TimeWeb (see CURRENT_STATE.md).
 on:
   workflow_run:
     workflows: ["CAOS CI"]
@@ -10,11 +12,11 @@ on:
     branches: [main]
 
 jobs:
-  deploy-backend:
+  deploy:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy backend to VPS (Docker runtime)
+      - name: Deploy backend and frontend to VPS (Docker runtime)
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -29,11 +31,10 @@ jobs:
             # Backup the running database before any schema change
             # (pg_dump inside the db container - no host credentials needed).
             STAMP=$(date +%Y%m%d_%H%M%S)
-            docker compose -p caos-platform exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' \
-              > "/opt/caos/backup-pre-migration-$STAMP.sql"
+            docker compose -p caos-platform exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"'               > "/opt/caos/backup-pre-migration-$STAMP.sql"
             test -s "/opt/caos/backup-pre-migration-$STAMP.sql" || { echo "backup is empty, aborting"; exit 1; }
 
-            # Build the new image, migrate via a one-off container while the
+            # Build new images, migrate via a one-off container while the
             # old containers keep serving, then recreate the services.
             docker compose -p caos-platform build backend frontend
             docker compose -p caos-platform run --rm --no-deps backend python -m alembic upgrade head
@@ -42,48 +43,3 @@ jobs:
             curl -fsS http://127.0.0.1:8000/health
             # A v0.2 route must exist (401 = route present, auth required).
             curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/goals/1/impact | grep -q 401
-
-  deploy-frontend:
-    if: github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
-    needs: deploy-backend
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Build frontend
-        working-directory: frontend
-        env:
-          VITE_API_URL: https://api-caos.thinkred.ru/api/v1
-        run: |
-          npm ci
-          npm run build
-
-      - name: Upload dist to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: root
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "frontend/dist/*"
-          target: "/opt/caos/frontend/dist/"
-          strip_components: 2
-
-      - name: Deploy frontend to TimeWeb via lftp
-        uses: appleboy/ssh-action@v1.2.0
-        env:
-          FTP_USER: ${{ secrets.FTP_USER }}
-          FTP_PASS: ${{ secrets.FTP_PASS }}
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: root
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            set -e
-            cp -a /opt/caos/frontend/dist/* /var/www/caos.thinkred.ru/
-            lftp -u "$FTP_USER,$FTP_PASS" 87.232.64.20 -e "set ftp:ssl-allow no; mirror -R --delete /opt/caos/frontend/dist/ /www/caos.thinkred.ru/; quit"
