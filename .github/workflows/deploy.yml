@@ -43,3 +43,9 @@ jobs:
             curl -fsS http://127.0.0.1:8000/health
             # A v0.2 route must exist (401 = route present, auth required).
             curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/goals/1/impact | grep -q 401
+
+            # Idempotently install the daily backup job (Step 23).
+            # Script and cron file are versioned in scripts/; retention
+            # and the restore procedure: docs/operations/backup-restore.md
+            install -m 755 scripts/caos-backup.sh /usr/local/bin/caos-backup.sh
+            install -m 644 scripts/caos-backup.cron /etc/cron.d/caos-backup

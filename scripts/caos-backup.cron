@@ -1,0 +1,2 @@
+# CAOS daily database backup (installed by deploy.yml)
+30 3 * * * root /usr/local/bin/caos-backup.sh >> /var/log/caos-backup.log 2>&1
