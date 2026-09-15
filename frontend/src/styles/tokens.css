@@ -54,6 +54,9 @@
   --space-6: 24px;
   --space-8: 32px;
 
+  /* reading measure for body text */
+  --measure: 720px;
+
   /* type scale */
   --font-display: 40px;
   --font-title: 24px;

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { AIProposalsPanel } from "./ai/AIProposalsPanel";
+import { SkeletonRows } from "./ui/Skeleton";
 import { AuthScreen } from "./auth/AuthScreen";
 import { MyActivity } from "./activity/MyActivity";
 import { AuditSection } from "./audit/AuditSection";
@@ -37,6 +38,7 @@ const labels: Record<Section, string> = {
 
 export default function AppNew() {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const [route, navigate] = useHashRoute();
   const section = route.section;
   const workspaceGoalId = route.goalId;
@@ -95,6 +97,7 @@ export default function AppNew() {
   };
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const [problemData, goalData, projectData, teamData, decisionData, knowledgeData, actionData, notifData, auditData, compData] =
         await Promise.all([
@@ -133,6 +136,8 @@ export default function AppNew() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки данных");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -720,7 +725,9 @@ export default function AppNew() {
                 </div>
                 <span className="count">{items.length}</span>
               </div>
-              {items.length === 0 ? (
+              {loading && items.length === 0 ? (
+                <SkeletonRows rows={4} />
+              ) : items.length === 0 ? (
                 <p className="muted empty">Записей пока нет.</p>
               ) : (
                 <div className="problem-list">
@@ -946,7 +953,9 @@ export default function AppNew() {
                 </div>
                 <span className="count">{decisions.length}</span>
               </div>
-              {decisions.length === 0 ? (
+              {loading && decisions.length === 0 ? (
+                <SkeletonRows rows={3} />
+              ) : decisions.length === 0 ? (
                 <p className="muted empty">Предложений пока нет.</p>
               ) : (
                 <div className="problem-list">
@@ -1025,7 +1034,7 @@ export default function AppNew() {
           />
         )}
 
-        {section === "audit" && <AuditSection auditEvents={auditEvents} />}
+        {section === "audit" && <AuditSection auditEvents={auditEvents} loading={loading} />}
 
         {section === "competences" && (
           <CompetencesSection

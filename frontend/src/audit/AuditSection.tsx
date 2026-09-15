@@ -1,6 +1,8 @@
 import type { AuditEvent } from "../types";
 
-export function AuditSection({ auditEvents }: { auditEvents: AuditEvent[] }) {
+import { SkeletonRows } from "../ui/Skeleton";
+
+export function AuditSection({ auditEvents, loading }: { auditEvents: AuditEvent[]; loading?: boolean }) {
   return (
     <div className="catalog-layout">
       <section className="panel">
