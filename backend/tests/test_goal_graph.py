@@ -181,8 +181,7 @@ def test_timeline_merges_events_chronologically(client, outbox):
         json={"activity_type": "meeting", "title": "Встреча Т"},
     )
     owner.post(f"/api/v1/goals/{goal['id']}/results", json={"description": "Результат Т"})
-    member_client = owner  # challenge by owner too (access ok)
-    member_client.post(
+    owner.post(
         "/api/v1/challenges",
         json={
             "target_type": "goal", "target_id": goal["id"],
@@ -201,4 +200,3 @@ def test_timeline_merges_events_chronologically(client, outbox):
     created = [e["created_at"] for e in events]
     assert created == sorted(created, reverse=True)
 
-    stranger = owner  # access test done in impact/explain tests; skip repeat
