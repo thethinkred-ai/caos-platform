@@ -16,7 +16,7 @@ from ..access import require_goal
 from ..permissions import require_capability
 from ..db import get_db
 from ..deps import current_user
-from ..models import Activity, AuditEvent, Commitment, Decision, Goal, GoalRelation, Problem, Project, ProjectGoal, Result, Task, User
+from ..models import Activity, AuditEvent, Challenge, Commitment, Decision, Goal, GoalParticipation, GoalRelation, Problem, Project, ProjectGoal, Result, Task, User
 from ..schemas import ExplainNode, GoalExplain, GoalImpact, GoalRelationCreate, GoalRelationOut
 
 router = APIRouter()
@@ -205,3 +205,56 @@ def explain_goal(goal_id: int, db: Db, user: CurrentUser) -> GoalExplain:
         "results": len(results),
     }
     return GoalExplain(goal_id=goal_id, chain=chain, counts=counts)
+
+
+@router.get("/goals/{goal_id}/timeline")
+def goal_timeline(goal_id: int, db: Db, user: CurrentUser) -> list[dict]:
+    """Unified chronology of a goal (Step 35): typed events from every
+    domain table merged in time order - the goal's 'life story'."""
+    require_goal(db, user.id, goal_id)
+
+    events: list[dict] = []
+
+    def add(kind: str, title: str, status: str, created_at, actor_id: int | None = None, detail: str = "") -> None:
+        events.append({
+            "kind": kind,
+            "title": title,
+            "status": status,
+            "actor_id": actor_id,
+            "detail": detail,
+            "created_at": created_at.isoformat() if created_at else "",
+        })
+
+    goal = db.get(Goal, goal_id)
+    add("goal", goal.title, goal.status, goal.created_at, goal.owner_id, "цель создана")
+
+    participations = list(db.scalars(
+        select(GoalParticipation).where(GoalParticipation.goal_id == goal_id)
+    ))
+    for p in participations:
+        add("participation", f"участник: {p.role}", p.status, p.joined_at, p.user_id)
+        if p.left_at:
+            add("participation", "участник покинул цель", "left", p.left_at, p.user_id)
+
+    decisions = list(db.scalars(select(Decision).where(Decision.goal_id == goal_id)))
+    for d in decisions:
+        add("decision", d.title, d.status, d.created_at, d.author_id, d.proposal[:150])
+
+    commitments = list(db.scalars(select(Commitment).where(Commitment.goal_id == goal_id)))
+    for c in commitments:
+        add("commitment", c.description[:120], c.status, c.created_at, c.user_id, c.expected_result[:150])
+
+    activities = list(db.scalars(select(Activity).where(Activity.goal_id == goal_id)))
+    for a in activities:
+        add("activity", f"[{a.activity_type}] {a.title[:100]}", a.status, a.created_at, a.created_by)
+
+    results = list(db.scalars(select(Result).where(Result.goal_id == goal_id)))
+    for r in results:
+        add("result", r.description[:120], r.status, r.created_at, r.reported_by, r.actual_state[:150])
+
+    challenges = list(db.scalars(select(Challenge).where(Challenge.target_type == "goal", Challenge.target_id == goal_id)))
+    for ch in challenges:
+        add("challenge", ch.claim[:120], ch.status, ch.created_at, ch.author_id, ch.argument[:150])
+
+    events.sort(key=lambda e: e["created_at"], reverse=True)
+    return events

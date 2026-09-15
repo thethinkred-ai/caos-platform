@@ -17,6 +17,7 @@ import {
   type GoalMeasurement,
   type GoalParticipation,
   type GoalRelation,
+  type TimelineEvent,
   type ResultItem,
   type User,
 } from "../types";
@@ -76,6 +77,8 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [delegations, setDelegations] = useState<Delegation[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const [activityType, setActivityType] = useState("task");
   const [activityTitle, setActivityTitle] = useState("");
   const [evaluations, setEvaluations] = useState<Record<number, Evaluation[]>>({});
@@ -107,7 +110,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
 
   const reload = useCallback(async () => {
     try {
-      const [goalData, impactData, relationsData, partsData, commitsData, criteriaData, resultsData, challengesData, explainData, delegationsData, activitiesData] =
+      const [goalData, impactData, relationsData, partsData, commitsData, criteriaData, resultsData, challengesData, explainData, delegationsData, activitiesData, timelineData] =
         await Promise.all([
           request<Goal[]>(`/goals`),
           request<GoalImpact>(`/goals/${goalId}/impact`),
@@ -120,6 +123,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           request<GoalExplain>(`/goals/${goalId}/explain`),
           request<Delegation[]>(`/goals/${goalId}/delegations`),
           request<Activity[]>(`/goals/${goalId}/activities`),
+          request<TimelineEvent[]>(`/goals/${goalId}/timeline`),
         ]);
       setGoal(goalData.find((g) => g.id === goalId) ?? null);
       setImpact(impactData);
@@ -132,6 +136,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
       setExplain(explainData);
       setDelegations(delegationsData);
       setActivities(activitiesData);
+      setTimeline(timelineData);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки цели");
@@ -376,6 +381,36 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
         </div>
         {error && <p className="error">{error}</p>}
       </section>
+
+      {timeline.length > 0 && (
+        <section className="panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">Хронология</span>
+              <h2>Жизнь цели во времени</h2>
+            </div>
+            <button onClick={() => setTimelineOpen(!timelineOpen)}>
+              {timelineOpen ? "Свернуть" : `Показать (${timeline.length})`}
+            </button>
+          </div>
+          {timelineOpen && (
+            <div className="event-timeline">
+              {timeline.map((ev, i) => (
+                <div key={`${ev.kind}-${i}`} className="event-timeline-item">
+                  <span className={`event-type-badge event-type-${ev.kind}`}>{ev.kind}</span>
+                  <div>
+                    <b>{ev.title}</b>
+                    {ev.detail && <p className="muted">{ev.detail}</p>}
+                    <small>
+                      {ev.status} · {new Date(ev.created_at).toLocaleString("ru-RU")}
+                    </small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {explain && explain.chain.length > 0 && (
         <section className="panel">

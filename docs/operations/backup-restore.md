@@ -28,6 +28,12 @@ cd /opt/caos && docker compose -p caos-platform start backend
 curl -fsS http://127.0.0.1:8000/health
 ```
 
+## Учебное восстановление (drill)
+
+`scripts/restore-drill.sh` разворачивает последний ежедневный дамп во временную базу `caos_restore_test`, сравнивает инварианты (goals/decisions/parts/results/evidence/users) с живой и удаляет временную. Первый прогон (2026-09-15): **DRILL PASSED**, инварианты совпали. Запуск: `ssh <vps> 'sh -s' < scripts/restore-drill.sh`.
+
+Тот же drill вскрыл переполнение диска (build cache Docker 3.2 GB) — деплой теперь ограничивает кэш (`--keep-storage 1GB`).
+
 ## Известное ограничение
 
 Бэкапы лежат на том же сервере, что и база (Step 23 п.5: «backup не рядом с оригиналом»). Следующий шаг по плану непрерывности — off-site копия (rsync на вторую машину tailnet или объектное хранилище) — требует второй площадки, решается на уровне владельца.

@@ -49,3 +49,6 @@ jobs:
             # and the restore procedure: docs/operations/backup-restore.md
             install -m 755 scripts/caos-backup.sh /usr/local/bin/caos-backup.sh
             install -m 644 scripts/caos-backup.cron /etc/cron.d/caos-backup
+
+            # Keep the build cache bounded - it once filled the disk (Step 23 lesson).
+            docker builder prune -f --keep-storage 1GB >/dev/null

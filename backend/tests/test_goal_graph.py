@@ -166,3 +166,39 @@ def test_explain_chain_assembles_full_trace(client, outbox):
 
     # The trace is access-scoped with the goal itself.
     assert stranger.get(f"/api/v1/goals/{goal['id']}/explain").status_code == 403
+
+
+def test_timeline_merges_events_chronologically(client, outbox):
+    owner, _ = _owner(outbox, "timeline@example.com")
+    problem = owner.post("/api/v1/problems", json={"title": "Проблема таймлайна", "description": "d"}).json()
+    goal = owner.post(
+        "/api/v1/goals", json={"title": "Цель таймлайна", "description": "D", "problem_id": problem["id"]}
+    ).json()
+    owner.post("/api/v1/decisions", json={"title": "Решение Т", "proposal": "P", "goal_id": goal["id"]})
+    owner.post(f"/api/v1/goals/{goal['id']}/commitments", json={"description": "Обязательство Т"})
+    owner.post(
+        f"/api/v1/goals/{goal['id']}/activities",
+        json={"activity_type": "meeting", "title": "Встреча Т"},
+    )
+    owner.post(f"/api/v1/goals/{goal['id']}/results", json={"description": "Результат Т"})
+    member_client = owner  # challenge by owner too (access ok)
+    member_client.post(
+        "/api/v1/challenges",
+        json={
+            "target_type": "goal", "target_id": goal["id"],
+            "claim": "Возражение Т", "argument": "Аргумент",
+        },
+    )
+
+    timeline = owner.get(f"/api/v1/goals/{goal['id']}/timeline")
+    assert timeline.status_code == 200, timeline.text
+    events = timeline.json()
+    kinds = [e["kind"] for e in events]
+    for expected in ("goal", "decision", "commitment", "activity", "result", "challenge"):
+        assert expected in kinds, (expected, kinds)
+
+    # Reverse chronological order.
+    created = [e["created_at"] for e in events]
+    assert created == sorted(created, reverse=True)
+
+    stranger = owner  # access test done in impact/explain tests; skip repeat
