@@ -1,3 +1,5 @@
+import { statusLabel } from "../labels";
+
 const GREEN = new Set(["active", "verified", "accepted", "fulfilled", "completed", "qualified", "addressed"]);
 const RED = new Set(["rejected", "failed", "cancelled", "disputed"]);
 const BLUE = new Set(["in_progress", "proposed", "under_review", "in_discussion", "voting", "reported", "under_verification"]);
@@ -13,10 +15,8 @@ function colorFor(status: string): "green" | "red" | "blue" | "yellow" | "gray" 
   return "gray";
 }
 
-/** Semantic status badge (Step 35): the color carries meaning -
- * green=confirmed/success, red=negative, blue=in motion, yellow=needs
- * attention, gray=neutral/parked. The text always accompanies the
- * color (status must explain itself, not rely on hue alone). */
-export function CaosStatus({ status, label }: { status: string; label?: string }) {
-  return <span className={`caos-status status-${colorFor(status)}`}>{label ?? status}</span>;
+/** Semantic status badge (Step 35): the color carries meaning and the
+ * text is always Russian (domain vocabulary lives in labels.ts). */
+export function CaosStatus({ status, label, context }: { status: string; label?: string; context?: string }) {
+  return <span className={`caos-status status-${colorFor(status)}`}>{label ?? statusLabel(status, context)}</span>;
 }

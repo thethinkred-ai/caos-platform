@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TARGET_LABELS } from "../labels";
 import type { Notification, Section } from "../types";
 
 const TARGET_SECTIONS: Record<string, Section> = {
@@ -75,7 +76,7 @@ export function NotificationsPanel({
                       n.message
                     )}</h3>
                     <small>
-                      {n.entity_type} #{n.entity_id} · {new Date(n.created_at).toLocaleString("ru-RU")}
+                      {TARGET_LABELS[n.entity_type] ?? n.entity_type} №{n.entity_id} · {new Date(n.created_at).toLocaleString("ru-RU")}
                     </small>
                     {!n.is_read && (
                       <button className="link-button" onClick={() => onMarkRead(n.id)}>

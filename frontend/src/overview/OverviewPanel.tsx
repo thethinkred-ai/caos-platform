@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { request } from "../api/client";
+import { statusLabel, TARGET_LABELS } from "../labels";
 import type { AuditEvent, Challenge, Commitment, Goal, Notification } from "../types";
 
 /** The action map (critique, sections 86/116): four questions instead of
@@ -135,7 +136,7 @@ export function OverviewPanel({
                       {g.title}
                     </button>
                   </h3>
-                  <small>{g.status} · #{g.id}</small>
+                  <small>{statusLabel(g.status, "goal")} · №{g.id}</small>
                 </div>
               </article>
             ))}
@@ -164,7 +165,7 @@ export function OverviewPanel({
                 <div>
                   <h3>{ch.claim}</h3>
                   <small>
-                    {ch.target_type} #{ch.target_id} · {ch.status}
+                    {TARGET_LABELS[ch.target_type] ?? ch.target_type} №{ch.target_id} · {statusLabel(ch.status, "challenge")}
                   </small>
                 </div>
               </article>

@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { request } from "../api/client";
+import { METHOD_LABELS, statusLabel, VOTE_LABELS } from "../labels";
 import { CaosStatus } from "../ui/CaosStatus";
 import type { Challenge, Decision, ProposalVersion, User, VoteSummary } from "../types";
 
@@ -82,7 +83,7 @@ export function DecisionProcess({
   return (
     <div className="decision-process" style={{ marginTop: 10 }}>
       <div className="project-meta">
-        <span>метод: <b>{decision.decision_method}</b></span>
+        <span>метод: <b>{METHOD_LABELS[decision.decision_method] ?? decision.decision_method}</b></span>
         <span>кворум: <b>{decision.quorum}</b></span>
         {decision.valid_until && <span>действует до: <b>{decision.valid_until.slice(0, 10)}</b></span>}
       </div>
@@ -94,7 +95,7 @@ export function DecisionProcess({
             За {votes.accept} · Против {votes.reject} · всего {votes.total}/{votes.quorum}
             {votes.quorum_met ? " ✓" : " — кворум не собран"}
           </b>
-          {votes.own_vote && <small> · ваш голос: {votes.own_vote.variant}</small>}
+          {votes.own_vote && <small> · ваш голос: {VOTE_LABELS[votes.own_vote.variant] ?? votes.own_vote.variant}</small>}
           {open && canVote && !votes.own_vote && (
             <div className="event-buttons" style={{ marginTop: 6 }}>
               <button className="primary" disabled={busy} onClick={() => vote("accept")}>
@@ -116,7 +117,7 @@ export function DecisionProcess({
             <div className="event-timeline" style={{ marginTop: 6 }}>
               {votes.votes.map((v) => (
                 <div key={v.id} className="event-timeline-item">
-                  <span className={`event-type-badge event-type-${v.variant === "accept" ? "accepted" : "rejected"}`}>{v.variant}</span>
+                  <span className={`event-type-badge event-type-${v.variant === "accept" ? "accepted" : "rejected"}`}>{VOTE_LABELS[v.variant] ?? v.variant}</span>
                   <div>
                     {v.comment && <p>{v.comment}</p>}
                     <small>{new Date(v.created_at).toLocaleDateString("ru-RU")}</small>
@@ -150,7 +151,7 @@ export function DecisionProcess({
           <b>Возражения</b>
           {challenges.map((ch) => (
             <div key={ch.id} className="event-timeline-item" style={{ marginTop: 6 }}>
-              <CaosStatus status={ch.status} />
+              <CaosStatus status={ch.status} context="challenge" />
               <div>
                 <b>{ch.claim}</b>
                 <p className="muted">{ch.argument}</p>

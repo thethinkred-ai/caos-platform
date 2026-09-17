@@ -13,6 +13,7 @@ import { OverviewPanel } from "./overview/OverviewPanel";
 import { DecisionProcess } from "./decisions/DecisionProcess";
 import { useHashRoute } from "./app/useHashRoute";
 import { API_URL, request } from "./api/client";
+import { statusLabel } from "./labels";
 import { GoalWorkspace } from "./goal/GoalWorkspace";
 import { NewGoalWizard } from "./goal/NewGoalWizard";
 import { OnboardingTour } from "./OnboardingTour";
@@ -738,8 +739,8 @@ export default function AppNew() {
                         <h3>{item.title}</h3>
                         <p>{item.description}</p>
                         <small>
-                          {item.status} · #{item.id}
-                          {"parent_goal_id" in item && item.parent_goal_id && ` · sub-goal of #${item.parent_goal_id}`}
+                          {statusLabel(item.status, section === "problems" ? "problem" : section === "goals" ? "goal" : undefined)} · №{item.id}
+                          {"parent_goal_id" in item && item.parent_goal_id && ` · подцель №${item.parent_goal_id}`}
                         </small>
                         {section === "problems" && (
                           <>
@@ -970,7 +971,7 @@ export default function AppNew() {
                         <h3>{decision.title}</h3>
                         <p>{decision.proposal}</p>
                         <small>
-                          {decision.status} · #{decision.id}
+                          {statusLabel(decision.status, "decision")} · №{decision.id}
                         </small>
                       </div>
                     </article>

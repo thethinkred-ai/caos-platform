@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { request } from "../api/client";
+import { statusLabel } from "../labels";
 import { CaosStatus } from "../ui/CaosStatus";
 import type { Commitment, Competence, Goal } from "../types";
 
-const STATUS_LABELS: Record<string, string> = {
-  open: "взято",
-  in_progress: "в работе",
-  fulfilled: "выполнено",
-  failed: "не выполнено",
-  withdrawn: "снято",
-};
+
 
 /** «Моя деятельность»: мои обязательства по всем целям — вместо списка
  * «моих проектов» (Track F: деятельность центрирована на целях). */
@@ -105,7 +100,7 @@ export function MyActivity({ onOpenGoal }: { onOpenGoal?: (goalId: number) => vo
                     <h3>{c.description}</h3>
                     {c.expected_result && <p className="muted">Ожидание: {c.expected_result}</p>}
                     <small>
-                      <CaosStatus status={c.status} label={STATUS_LABELS[c.status] ?? c.status} />{" "}
+                      <CaosStatus status={c.status} label={statusLabel(c.status, "commitment")} />{" "}
                       {goal ? "цель: " : "цель #"}
                       {goal && (
                         <button className="link-button" onClick={() => onOpenGoal?.(goal.id)}>
@@ -152,7 +147,7 @@ export function MyActivity({ onOpenGoal }: { onOpenGoal?: (goalId: number) => vo
                 <span className="problem-icon">✓</span>
                 <div>
                   <h3>
-                    {c.description} <CaosStatus status={c.status} label={STATUS_LABELS[c.status] ?? c.status} />
+                    {c.description} <CaosStatus status={c.status} label={statusLabel(c.status, "commitment")} />
                   </h3>
                   {c.status === "fulfilled" && (
                     <>

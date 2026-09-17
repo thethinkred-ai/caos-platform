@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { request } from "../api/client";
+import { capabilityLabel, kindLabel, relationLabel, roleLabel, CRITERION_LABELS, statusLabel } from "../labels";
 import { CaosStatus } from "../ui/CaosStatus";
 import {
   CRITERION_TYPES,
@@ -358,7 +359,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
             <h2>{goal.title}</h2>
             <p className="muted">{goal.description}</p>
             <small>
-              <CaosStatus status={goal.status} label={`статус: ${goal.status}`} /> #{goal.id}
+              <CaosStatus status={goal.status} label={`статус: ${statusLabel(goal.status, "goal")}`} /> #{goal.id}
             </small>
           </div>
           <button onClick={onBack}>← К списку</button>
@@ -376,7 +377,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           )}
           {myParticipation && (
             <button disabled={busy} onClick={leave}>
-              Выйти из цели (роль: {myParticipation.role})
+              Выйти из цели (роль: {roleLabel(myParticipation.role)})
             </button>
           )}
         </div>
@@ -398,12 +399,12 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
             <div className="event-timeline">
               {timeline.map((ev, i) => (
                 <div key={`${ev.kind}-${i}`} className="event-timeline-item">
-                  <span className={`event-type-badge event-type-${ev.kind}`}>{ev.kind}</span>
+                  <span className={`event-type-badge event-type-${ev.kind}`}>{kindLabel(ev.kind)}</span>
                   <div>
                     <b>{ev.title}</b>
                     {ev.detail && <p className="muted">{ev.detail}</p>}
                     <small>
-                      {ev.status} · {new Date(ev.created_at).toLocaleString("ru-RU")}
+                      {statusLabel(ev.status)} · {new Date(ev.created_at).toLocaleString("ru-RU")}
                     </small>
                   </div>
                 </div>
@@ -426,11 +427,11 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
             <div className="event-timeline">
               {explain.chain.map((node, i) => (
                 <div key={`${node.kind}-${node.id}-${i}`} className="event-timeline-item">
-                  <span className={`event-type-badge event-type-${node.kind}`}>{node.kind} #{node.id}</span>
+                  <span className={`event-type-badge event-type-${node.kind}`}>{kindLabel(node.kind)} №{node.id}</span>
                   <div>
                     <b>{node.title}</b>
                     {node.detail && <p className="muted">{node.detail}</p>}
-                    <small>{node.status}</small>
+                    <small>{statusLabel(node.status)}</small>
                   </div>
                 </div>
               ))}
@@ -482,7 +483,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
                 <div>
                   <h3>
                     {r.source_goal_id === goalId ? "Эта цель" : goalTitle(r.source_goal_id)}{" "}
-                    <span className="event-type-badge">{r.relation_type}</span>{" "}
+                    <span className="event-type-badge">{relationLabel(r.relation_type)}</span>{" "}
                     {r.target_goal_id === goalId ? "эта цель" : goalTitle(r.target_goal_id)}
                   </h3>
                   <p>{r.rationale}</p>
@@ -505,7 +506,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           <select value={relType} onChange={(e) => setRelType(e.target.value)}>
             {GOAL_RELATION_TYPES.map((t) => (
               <option key={t} value={t}>
-                {t}
+                {relationLabel(t)}
               </option>
             ))}
           </select>
@@ -533,7 +534,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
                 <span className="problem-icon">◦</span>
                 <div>
                   <h3>
-                    {p.display_name} <span className="event-type-badge">{p.role}</span>
+                    {p.display_name} <span className="event-type-badge">{roleLabel(p.role)}</span>
                   </h3>
                   <small>{p.status === "active" ? `с ${p.joined_at.slice(0, 10)}` : `вышел(ла) ${p.left_at?.slice(0, 10) ?? ""}`}</small>
                 </div>
@@ -555,7 +556,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           <article key={c.id} style={{ marginBottom: 8 }}>
             <div>
               <h3>
-                {c.display_name}: {c.description} <CaosStatus status={c.status} />
+                {c.display_name}: {c.description} <CaosStatus status={c.status} context="commitment" />
               </h3>
               {c.expected_result && <p className="muted">Ожидание: {c.expected_result}</p>}
               {c.user_id === user.id && (COMMITMENT_NEXT[c.status] ?? []).length > 0 && (
@@ -598,7 +599,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
                 <span className="problem-icon">≡</span>
                 <div>
                   <h3>
-                    {c.name} <span className="event-type-badge">{c.criterion_type}</span>
+                    {c.name} <span className="event-type-badge">{CRITERION_LABELS[c.criterion_type] ?? c.criterion_type}</span>
                   </h3>
                   <small>
                     {c.baseline && `базовая: ${c.baseline} → `}цель: {c.target_value} {c.unit}
@@ -649,7 +650,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           <article key={r.id} style={{ marginBottom: 10 }}>
             <div>
               <h3>
-                {r.description} <CaosStatus status={r.status} />
+                {r.description} <CaosStatus status={r.status} context="result" />
               </h3>
               {r.actual_state && <p className="muted">Фактически: {r.actual_state}</p>}
               <small>
@@ -741,7 +742,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
               </h3>
               {a.description && <p className="muted">{a.description}</p>}
               <small>
-                {a.status} · {a.creator_name}
+                {statusLabel(a.status, "activity")} · {a.creator_name}
                 {a.started_at && ` · начата ${a.started_at.slice(0, 10)}`}
                 {a.completed_at && ` · завершена ${a.completed_at.slice(0, 10)}`}
               </small>
@@ -793,7 +794,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           <article key={d.id} style={{ marginBottom: 6 }}>
             <div>
               <h3>
-                {d.capability} → {d.recipient_display_name || `#${d.recipient_id}`}
+                {capabilityLabel(d.capability)} → {d.recipient_display_name || `#${d.recipient_id}`}
               </h3>
               <small>
                 от {d.issuer_display_name || `#${d.issuer_id}`} · до {d.valid_until.slice(0, 10)} ·{" "}
@@ -816,7 +817,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
                 .filter((p) => p.status === "active" && p.user_id !== user.id)
                 .map((p) => (
                   <option key={p.user_id} value={p.user_id}>
-                    {p.display_name} ({p.role})
+                    {p.display_name} — {roleLabel(p.role)}
                   </option>
                 ))}
             </select>
@@ -851,7 +852,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           <article key={ch.id} style={{ marginBottom: 8 }}>
             <div>
               <h3>
-                {ch.claim} <CaosStatus status={ch.status} />
+                {ch.claim} <CaosStatus status={ch.status} context="challenge" />
               </h3>
               <p className="muted">{ch.argument}</p>
               {ch.resolution && <small>Резолюция: {ch.resolution}</small>}
