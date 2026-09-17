@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { request } from "../api/client";
+import { CaosStatus } from "../ui/CaosStatus";
 import {
   CRITERION_TYPES,
   EVIDENCE_TYPES,
@@ -357,7 +358,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
             <h2>{goal.title}</h2>
             <p className="muted">{goal.description}</p>
             <small>
-              <span className="event-type-badge">статус: {goal.status}</span> #{goal.id}
+              <CaosStatus status={goal.status} label={`статус: ${goal.status}`} /> #{goal.id}
             </small>
           </div>
           <button onClick={onBack}>← К списку</button>
@@ -554,7 +555,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           <article key={c.id} style={{ marginBottom: 8 }}>
             <div>
               <h3>
-                {c.display_name}: {c.description} <span className="event-type-badge">{c.status}</span>
+                {c.display_name}: {c.description} <CaosStatus status={c.status} />
               </h3>
               {c.expected_result && <p className="muted">Ожидание: {c.expected_result}</p>}
               {c.user_id === user.id && (COMMITMENT_NEXT[c.status] ?? []).length > 0 && (
@@ -648,7 +649,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           <article key={r.id} style={{ marginBottom: 10 }}>
             <div>
               <h3>
-                {r.description} <span className="event-type-badge">{r.status}</span>
+                {r.description} <CaosStatus status={r.status} />
               </h3>
               {r.actual_state && <p className="muted">Фактически: {r.actual_state}</p>}
               <small>
@@ -796,7 +797,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
               </h3>
               <small>
                 от {d.issuer_display_name || `#${d.issuer_id}`} · до {d.valid_until.slice(0, 10)} ·{" "}
-                <span className="event-type-badge">{d.revoked_at ? "отозвано" : d.is_active ? "активно" : "истекло"}</span>
+                <CaosStatus status={d.is_active ? "accepted" : "closed"} label={d.revoked_at ? "отозвано" : d.is_active ? "активно" : "истекло"} />
               </small>
               {d.reason && <p className="muted">{d.reason}</p>}
               {d.is_active && (isOwner || d.issuer_id === user.id) && (
@@ -850,7 +851,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           <article key={ch.id} style={{ marginBottom: 8 }}>
             <div>
               <h3>
-                {ch.claim} <span className="event-type-badge">{ch.status}</span>
+                {ch.claim} <CaosStatus status={ch.status} />
               </h3>
               <p className="muted">{ch.argument}</p>
               {ch.resolution && <small>Резолюция: {ch.resolution}</small>}

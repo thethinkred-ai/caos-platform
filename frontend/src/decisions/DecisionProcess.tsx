@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { request } from "../api/client";
+import { CaosStatus } from "../ui/CaosStatus";
 import type { Challenge, Decision, ProposalVersion, User, VoteSummary } from "../types";
 
 /** The decision as a process (Track F): versions of the proposal, the
@@ -149,7 +150,7 @@ export function DecisionProcess({
           <b>Возражения</b>
           {challenges.map((ch) => (
             <div key={ch.id} className="event-timeline-item" style={{ marginTop: 6 }}>
-              <span className="event-type-badge">{ch.status}</span>
+              <CaosStatus status={ch.status} />
               <div>
                 <b>{ch.claim}</b>
                 <p className="muted">{ch.argument}</p>

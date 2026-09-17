@@ -24,6 +24,10 @@
 - **`--warning`** = внимание без ошибки.
 - Кнопки на primary-поверхностях используют `--on-primary` (постоянный белый).
 
+### Статусы — `ui/CaosStatus`
+
+Единственный способ показать статус: `<CaosStatus status={...} label={...?} />`. Цвет по словарю: зелёный (active, verified, accepted, fulfilled, completed, qualified), красный (rejected, failed, cancelled, disputed), синий (in_progress, proposed, under_review, voting, reported), жёлтый (suspended, achieved, deferred, acknowledged, open), серый (draft, closed, abandoned, superseded, withdrawn). Текст всегда сопровождает цвет — статус обязан объяснять себя без опоры на оттенок. Проверено computed styles на живых данных.
+
 ### Радиусы, отступы, типографика
 `--radius-sm/md/lg` (6/8/12px), шкала `--space-1..8` (4px база), шкала шрифта `--font-display..--font-meta`. Применение шкалы — по мере касания компонентов (не массовая замена).
 

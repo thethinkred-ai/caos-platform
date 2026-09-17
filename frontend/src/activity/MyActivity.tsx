@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { request } from "../api/client";
+import { CaosStatus } from "../ui/CaosStatus";
 import type { Commitment, Competence, Goal } from "../types";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -104,7 +105,7 @@ export function MyActivity({ onOpenGoal }: { onOpenGoal?: (goalId: number) => vo
                     <h3>{c.description}</h3>
                     {c.expected_result && <p className="muted">Ожидание: {c.expected_result}</p>}
                     <small>
-                      <span className="event-type-badge">{STATUS_LABELS[c.status] ?? c.status}</span>{" "}
+                      <CaosStatus status={c.status} label={STATUS_LABELS[c.status] ?? c.status} />{" "}
                       {goal ? "цель: " : "цель #"}
                       {goal && (
                         <button className="link-button" onClick={() => onOpenGoal?.(goal.id)}>
@@ -151,7 +152,7 @@ export function MyActivity({ onOpenGoal }: { onOpenGoal?: (goalId: number) => vo
                 <span className="problem-icon">✓</span>
                 <div>
                   <h3>
-                    {c.description} <span className="event-type-badge">{STATUS_LABELS[c.status] ?? c.status}</span>
+                    {c.description} <CaosStatus status={c.status} label={STATUS_LABELS[c.status] ?? c.status} />
                   </h3>
                   {c.status === "fulfilled" && (
                     <>

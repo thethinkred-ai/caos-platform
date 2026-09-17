@@ -83,3 +83,15 @@
 .onboarding-next:hover{background:var(--primary-deep)}
 
 .skeleton{height:14px;border-radius:var(--radius-sm);background:linear-gradient(90deg,var(--surface-muted) 25%,var(--border-subtle) 50%,var(--surface-muted) 75%);background-size:200% 100%;animation:skeleton-wave 1.4s ease infinite;margin:0 0 10px}.skeleton-lg{height:18px}.skeleton-wave{animation:skeleton-wave 1.4s ease infinite}@keyframes skeleton-wave{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.caos-status{display:inline-block;padding:2px 8px;border-radius:var(--radius-sm);font-size:var(--font-meta);font-weight:600;line-height:1.4;border:1px solid transparent}
+.status-green{background:var(--success-soft);color:#1a6b45;border-color:var(--success)}
+.status-red{background:var(--danger-soft);color:var(--danger-deep);border-color:var(--danger)}
+.status-yellow{background:var(--warning-soft);color:#8a6410;border-color:var(--warning)}
+.status-blue{background:var(--primary-soft);color:var(--primary-deep);border-color:var(--primary)}
+.status-gray{background:var(--surface-muted);color:var(--text-muted);border-color:var(--border)}
+/* micro-motion: transitions explain state changes */
+button,.panel,.caos-status,.event-type-badge{transition:background-color .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease}
+button:not(:disabled):hover{filter:brightness(1.05)}
+button:not(:disabled):active{transform:translateY(1px)}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
