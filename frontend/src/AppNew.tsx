@@ -733,8 +733,11 @@ export default function AppNew() {
               ) : (
                 <div className="problem-list">
                   {items.map((item: Problem | Goal | Project) => (
-                    <article key={item.id}>
-                      <span className="problem-icon">●</span>
+<article
+                    key={item.id}
+                    style={section === "goals" ? { cursor: "pointer" } : undefined}
+                    onClick={section === "goals" ? () => goGoal(item.id) : undefined}
+                  >                      <span className="problem-icon">●</span>
                       <div>
                         <h3>{item.title}</h3>
                         <p>{item.description}</p>
