@@ -65,7 +65,7 @@ export function NewGoalWizard({
   };
 
   return (
-    <form onSubmit={submit} className="problem-form">
+    <form onSubmit={submit} className="problem-form" data-tour="goal-wizard">
       <div className="panel-heading" style={{ marginBottom: 8 }}>
         <div>
           <span className="eyebrow">Шаг {step + 1} из {STEPS.length}</span>

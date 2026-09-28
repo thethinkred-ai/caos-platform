@@ -90,7 +90,7 @@ export function ProfileSection({
         </div>
       </section>
 
-      <section className="panel">
+      <section className="panel" data-tour="privacy">
         <div className="panel-heading">
           <div>
             <span className="eyebrow">Приватность</span>

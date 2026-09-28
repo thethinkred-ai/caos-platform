@@ -36,7 +36,7 @@ export function NotificationsPanel({
 
   return (
     <div className="catalog-layout">
-      <section className="panel">
+      <section className="panel" data-tour="notifications">
         <div className="panel-heading">
           <div>
             <span className="eyebrow">In-app</span>

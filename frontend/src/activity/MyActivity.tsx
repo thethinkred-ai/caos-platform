@@ -78,7 +78,7 @@ export function MyActivity({ onOpenGoal }: { onOpenGoal?: (goalId: number) => vo
 
   return (
     <>
-      <section className="panel">
+      <section className="panel" data-tour="my-activity">
         <div className="panel-heading">
           <div>
             <span className="eyebrow">Моя деятельность</span>

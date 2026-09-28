@@ -16,7 +16,7 @@ import { API_URL, request } from "./api/client";
 import { statusLabel } from "./labels";
 import { GoalWorkspace } from "./goal/GoalWorkspace";
 import { NewGoalWizard } from "./goal/NewGoalWizard";
-import { OnboardingTour } from "./OnboardingTour";
+import { CoachTour } from "./tour/CoachTour";
 import type {
   AuditEvent, Competence, Decision, DecisionEvent, Goal, KnowledgeItem, NextAction,
   Notification, Problem, ProblemVersion, Project, SearchResults, Section, Task, Team, User,
@@ -40,6 +40,7 @@ const labels: Record<Section, string> = {
 export default function AppNew() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tourOpen, setTourOpen] = useState(false);
   const [route, navigate] = useHashRoute();
   const section = route.section;
   const workspaceGoalId = route.goalId;
@@ -141,6 +142,10 @@ export default function AppNew() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!localStorage.getItem("caos_tour_done")) setTourOpen(true);
+  }, []);
 
   useEffect(() => {
     const path = window.location.pathname;
@@ -417,14 +422,14 @@ export default function AppNew() {
 
   return (
     <div className="app-shell">
-      <OnboardingTour onComplete={() => {}} />
+      <CoachTour open={tourOpen} onClose={() => setTourOpen(false)} />
       <aside>
         <div className="brand">
           <span className="brand-mark">C</span>
           <span>CAOS</span>
         </div>
         <p className="side-caption">Collective Activity Operating System</p>
-        <nav>
+        <nav data-tour="nav">
           {(Object.keys(labels) as Section[]).map((key) => {
             const unreadCount = key === "notifications" ? notifications.filter((n) => !n.is_read).length : 0;
             return (
@@ -442,6 +447,13 @@ export default function AppNew() {
             );
           })}
         </nav>
+        <button
+          className="link-button"
+          style={{ marginTop: 8, textAlign: "left" }}
+          onClick={() => setTourOpen(true)}
+        >
+          ? Обучение интерфейсу
+        </button>
         <button
           className="logout"
           onClick={() => {

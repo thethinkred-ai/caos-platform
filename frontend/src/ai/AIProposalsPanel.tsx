@@ -50,7 +50,7 @@ export function AIProposalsPanel() {
   const reviewed = proposals.filter((p) => p.status !== "pending");
 
   return (
-    <section className="panel">
+    <section className="panel" data-tour="ai-proposals">
       <div className="panel-heading">
         <div>
           <span className="eyebrow">AI предлагает — вы решаете</span>

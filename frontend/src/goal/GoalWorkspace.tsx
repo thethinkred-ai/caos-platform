@@ -352,7 +352,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
 
   return (
     <div className="goal-workspace">
-      <section className="panel">
+      <section className="panel" data-tour="goal-header">
         <div className="panel-heading">
           <div>
             <span className="eyebrow">Цель · рабочее пространство</span>
@@ -364,7 +364,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           </div>
           <button onClick={onBack}>← К списку</button>
         </div>
-        <div className="event-buttons" style={{ marginTop: 10 }}>
+        <div className="event-buttons" style={{ marginTop: 10 }} data-tour="goal-lifecycle">
           {lifecycle.map(({ label, from }) => (
             <button key={from[0]} className="primary" disabled={busy} onClick={() => transition(from[0])}>
               {label}
@@ -385,7 +385,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
       </section>
 
       {timeline.length > 0 && (
-        <section className="panel">
+        <section className="panel" data-tour="goal-timeline">
           <div className="panel-heading">
             <div>
               <span className="eyebrow">Хронология</span>
@@ -415,7 +415,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
       )}
 
       {explain && explain.chain.length > 0 && (
-        <section className="panel">
+        <section className="panel" data-tour="goal-explain">
           <div className="panel-heading">
             <div>
               <span className="eyebrow">Обоснование</span>
@@ -446,7 +446,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
       )}
 
       {impact && (
-        <section className="panel">
+        <section className="panel" data-tour="goal-impact">
           <div className="panel-heading">
             <div>
               <span className="eyebrow">Влияние</span>
@@ -465,7 +465,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
         </section>
       )}
 
-      <section className="panel">
+      <section className="panel" data-tour="goal-relations">
         <div className="panel-heading">
           <div>
             <span className="eyebrow">Граф целей</span>
@@ -517,7 +517,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
         </form>
       </section>
 
-      <section className="panel">
+      <section className="panel" data-tour="goal-participation">
         <div className="panel-heading">
           <div>
             <span className="eyebrow">Участие</span>
@@ -544,7 +544,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
         )}
       </section>
 
-      <section className="panel">
+      <section className="panel" data-tour="goal-commitments">
         <div className="panel-heading">
           <div>
             <span className="eyebrow">Обязательства</span>
@@ -580,7 +580,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
         </form>
       </section>
 
-      <section className="panel">
+      <section className="panel" data-tour="goal-criteria">
         <div className="panel-heading">
           <div>
             <span className="eyebrow">Измеримость</span>
@@ -638,7 +638,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
         </form>
       </section>
 
-      <section className="panel">
+      <section className="panel" data-tour="goal-results">
         <div className="panel-heading">
           <div>
             <span className="eyebrow">Результаты</span>
@@ -726,7 +726,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
         </form>
       </section>
 
-      <section className="panel">
+      <section className="panel" data-tour="goal-activities">
         <div className="panel-heading">
           <div>
             <span className="eyebrow">Деятельность</span>
@@ -782,7 +782,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
         </form>
       </section>
 
-      <section className="panel">
+      <section className="panel" data-tour="goal-delegations">
         <div className="panel-heading">
           <div>
             <span className="eyebrow">Полномочия</span>
@@ -840,7 +840,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
         )}
       </section>
 
-      <section className="panel">
+      <section className="panel" data-tour="goal-challenge">
         <div className="panel-heading">
           <div>
             <span className="eyebrow">Возражения</span>
