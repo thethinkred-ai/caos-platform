@@ -1,0 +1,15 @@
+title = "CAOS secret scan"
+
+# Current-tree scan (deployed as `gitleaks detect --no-git`).
+# Full history scanning is intentionally deferred until the owner purges
+# the leaked credentials from git history (docs/security/secret-cleanup.md).
+
+[allowlist]
+description = "Placeholders and documentation quotes"
+paths = [
+  '''.env\.example''',
+  '''^docs/''',
+  '''^README\.md''',
+  '''^CHANGELOG\.md''',
+  '''^CURRENT_STATE\.md''',
+]

@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { request } from "../api/client";
+import { LearningHint } from "../ui/LearningHint";
 import type { Goal, Problem } from "../types";
 
 const STEPS = ["Что должно измениться?", "Почему это важно?", "Как поймём, что получилось?"];
@@ -89,6 +90,11 @@ export function NewGoalWizard({
             onChange={(e) => setDescription(e.target.value)}
             required
           />
+          <LearningHint>
+            Цель — не задача и не пожелание, а описание изменения положения дел. «Сделать сайт» — задача;
+            «обеспечить 100 участникам доступ к обучению» — цель. Из этой формулировки система дальше
+            построит участников, обязательства и проверяемые результаты.
+          </LearningHint>
         </>
       )}
 
@@ -110,7 +116,11 @@ export function NewGoalWizard({
               </option>
             ))}
           </select>
-          <small className="muted">Проблема — основание цели: из какого положения дел она вырастает.</small>
+          <LearningHint>
+            Цель не возникает из воздуха: она вырастает из положения дел, которое вас не устраивает.
+            Привязка к проблеме (или родительской цели) — это обоснование, которое потом можно
+            проследить в цепочке «Почему эта цель существует».
+          </LearningHint>
         </>
       )}
 
@@ -126,7 +136,11 @@ export function NewGoalWizard({
             value={criterionTarget}
             onChange={(e) => setCriterionTarget(e.target.value)}
           />
-          <small className="muted">Без проверяемого критерия цель остаётся пожеланием — можно добавить позже.</small>
+          <LearningHint>
+            Без проверяемого критерия цель остаётся пожеланием: система не сможет отличить «задачи
+            закрыты» от «цель достигнута». Формат: базовое значение → целевое (0 → 6 уроков,
+            61% → 78%). Динамику вы будете фиксировать измерениями прямо в рабочем пространстве.
+          </LearningHint>
         </>
       )}
 

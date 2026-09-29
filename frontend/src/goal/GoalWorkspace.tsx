@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { request } from "../api/client";
 import { capabilityLabel, kindLabel, relationLabel, roleLabel, CRITERION_LABELS, statusLabel } from "../labels";
+import { LearningHint } from "../ui/LearningHint";
 import { CaosStatus } from "../ui/CaosStatus";
 import {
   CRITERION_TYPES,
@@ -577,6 +578,11 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
           <button className="primary" type="submit" disabled={busy}>
             Взять обязательство
           </button>
+          <LearningHint>
+            Обязательство добровольно: никто не назначает вас — вы сами берёте вклад в цель. Именно
+            обязательства связывают задачи с целями («зачем эта работа») и подтверждают компетенции
+            после выполнения.
+          </LearningHint>
         </form>
       </section>
 

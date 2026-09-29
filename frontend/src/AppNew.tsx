@@ -45,6 +45,18 @@ export default function AppNew() {
   const section = route.section;
   const workspaceGoalId = route.goalId;
   const goSection = (target: Section) => navigate(target);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        navigate("overview");
+        window.setTimeout(() => document.getElementById("global-search")?.focus(), 200);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const goGoal = (goalId: number) => navigate("goals", goalId);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -537,11 +549,12 @@ export default function AppNew() {
                 <div className="panel-heading">
                   <div>
                     <span className="eyebrow">Поиск</span>
-                    <h2>Найти по ключевому слову</h2>
+                    <h2>Найти по ключевому слову <small style={{ color: "var(--text-muted)", fontSize: "var(--font-meta)", fontWeight: 400 }}>Ctrl+K</small></h2>
                   </div>
                 </div>
                 <form onSubmit={doSearch} className="problem-form">
                   <input
+                    id="global-search"
                     placeholder="Введите запрос (минимум 2 символа)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
