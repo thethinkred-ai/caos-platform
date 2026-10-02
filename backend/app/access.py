@@ -26,7 +26,7 @@ def user_project_ids(db: Session, user_id: int) -> set[int]:
 def _active_delegation_goal_ids(db: Session, user_id: int) -> set[int]:
     """Goals where the user holds an active (in-term, unrevoked)
     delegation: need-to-act implies need-to-see."""
-    now = datetime.now(UTC)
+    now = datetime.now(UTC).replace(tzinfo=None)  # naive UTC, like the columns
     return set(db.scalars(
         select(Delegation.goal_id).where(
             Delegation.recipient_id == user_id,

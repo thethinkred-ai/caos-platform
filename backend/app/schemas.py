@@ -1,6 +1,18 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from datetime import UTC
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+
+def _naive_utc(value: datetime) -> datetime:
+    """Normalize aware datetimes to naive UTC: DB columns are timestamp
+    without time zone, and an aware value would silently shift by the
+    session timezone (bot audit 02.10.2026)."""
+    if value is not None and value.tzinfo is not None:
+        return value.astimezone(UTC).replace(tzinfo=None)
+    return value
+
 
 
 class UserCreate(BaseModel):
@@ -91,6 +103,7 @@ class ProblemQualify(BaseModel):
 
 
 class GoalCreate(BaseModel):
+    _utc_deadline = field_validator("deadline")(_naive_utc)
     title: str = Field(min_length=3, max_length=200)
     description: str = Field(min_length=1, max_length=5000)
     problem_id: int | None = None
@@ -157,6 +170,7 @@ class GoalTransition(BaseModel):
 
 
 class DecisionCreate(BaseModel):
+    _utc_deadline = field_validator("deadline", "valid_until", "review_at")(_naive_utc)
     title: str = Field(min_length=3, max_length=200)
     proposal: str = Field(min_length=1, max_length=5000)
     goal_id: int | None = None
@@ -224,6 +238,7 @@ class ProjectOut(ProjectCreate):
 
 
 class TaskCreate(BaseModel):
+    _utc_deadline = field_validator("deadline")(_naive_utc)
     title: str = Field(min_length=3, max_length=200)
     description: str = ""
     assignee_id: int | None = None
@@ -309,6 +324,7 @@ class GoalParticipationRoleUpdate(BaseModel):
 
 
 class CommitmentCreate(BaseModel):
+    _utc_deadline = field_validator("deadline")(_naive_utc)
     description: str = Field(min_length=3, max_length=2000)
     expected_result: str = Field(default="", max_length=2000)
     deadline: datetime | None = None
@@ -570,6 +586,7 @@ class GoalExplain(BaseModel):
 
 
 class DelegationCreate(BaseModel):
+    _utc_until = field_validator("valid_until")(_naive_utc)
     recipient_id: int
     capability: str = Field(pattern="^(coordinate|transition|verify_result)$")
     reason: str = Field(min_length=3, max_length=2000)

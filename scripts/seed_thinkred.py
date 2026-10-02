@@ -26,8 +26,9 @@ What it creates (the ThinkRed project structure):
 """
 
 import argparse
+import getpass
+import os
 import sys
-from datetime import datetime, timedelta
 
 import httpx
 
@@ -35,12 +36,14 @@ import httpx
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Create the ThinkRed project structure in CAOS")
     parser.add_argument("--url", default="https://api-caos.thinkred.ru/api/v1")
-    parser.add_argument("--email", help="email+password login")
-    parser.add_argument("--password")
+    parser.add_argument("--email", help="email login (password via CAOS_PASSWORD env or prompt; --password is deprecated - it leaks into shell history)")
+    parser.add_argument("--password", help="deprecated: use CAOS_PASSWORD or the interactive prompt")
     parser.add_argument("--token", help="one-time access token (Bearer), alternative to email/password")
     args = parser.parse_args()
-    if not args.token and not (args.email and args.password):
-        parser.error("either --token or both --email and --password are required")
+    if not args.token and not args.email:
+        parser.error("either --token, or --email (password via CAOS_PASSWORD/prompt), is required")
+    if not args.token and not args.password:
+        args.password = os.environ.get("CAOS_PASSWORD") or getpass.getpass("CAOS password: ")
     return args
 
 
@@ -116,7 +119,9 @@ class Caos:
 def main() -> int:
     args = parse_args()
     caos = Caos(args.url, args.email, args.password, args.token)
-    year_end = (datetime.utcnow() + timedelta(days=90)).strftime("%Y-%m-%dT23:59:00Z")
+    # Fixed dates: relative offsets would drift with the run date
+    # (bot review 02.10.2026).
+    year_end = "2026-12-31T23:59:00Z"
 
     print("\n[1/5] Проблема-основание")
     problem = caos.problem(
@@ -197,24 +202,24 @@ def main() -> int:
 
     print("\n[5/5] Этапы-задачи с сроками")
     stages = [
-        ("Свести три курса в единую траекторию с входным и итоговым тестированием", 30),
-        ("Составить редакционный календарь аналитики на квартал", 14),
-        ("Провести гейм-сессию симулятора с кружком и собрать обратную связь", 45),
-        ("Завести рабочие цели команды в CAOS и провести первую верификацию результата", 21),
-        ("Опубликовать runbook: восстановление, бэкапы, деплой", 30),
+        ("Свести три курса в единую траекторию с входным и итоговым тестированием", "2026-11-01"),
+        ("Составить редакционный календарь аналитики на квартал", "2026-10-16"),
+        ("Провести гейм-сессию симулятора с кружком и собрать обратную связь", "2026-11-16"),
+        ("Завести рабочие цели команды в CAOS и провести первую верификацию результата", "2026-10-23"),
+        ("Опубликовать runbook: восстановление, бэкапы, деплой", "2026-11-01"),
     ]
     existing_tasks = caos.client.get(f"/projects/{project['id']}/tasks").json()
     existing_titles = {t["title"] for t in existing_tasks}
-    for title, days in stages:
+    for title, date in stages:
         if title in existing_titles:
             print(f"  = задача существует: «{title}»")
             continue
-        deadline = (datetime.utcnow() + timedelta(days=days)).strftime("%Y-%m-%dT23:59:00Z")
+        deadline = f"{date}T23:59:00Z"
         created = caos.client.post(f"/projects/{project['id']}/tasks", json={
             "title": title, "description": "", "deadline": deadline,
         })
         created.raise_for_status()
-        print(f"  + задача: «{title}» (срок {deadline[:10]})")
+        print(f"  + задача: «{title}» (срок {date})")
 
     print("\nГотово. Дальше вручную:")
     print("  1. Провести стратегическую цель по процедуре: Предложить → Решение → Принять → Активировать.")

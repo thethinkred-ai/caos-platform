@@ -244,3 +244,18 @@ def test_goal_and_task_deadlines_roundtrip(client, outbox):
     )
     assert task.status_code == 201, task.text
     assert task.json()["deadline"] is not None
+
+
+def test_timezone_aware_deadline_stored_as_naive_utc(client, outbox):
+    owner, _ = _authed_user(client, outbox, "tz@example.com", "Tz Owner")
+    goal = owner.post(
+        "/api/v1/goals",
+        json={
+            "title": "Цель со сдвигом зоны",
+            "description": "Проверка нормализации времени",
+            "deadline": "2026-12-31T23:59:00+03:00",  # MSK
+        },
+    )
+    assert goal.status_code == 201
+    # +03:00 23:59 == 20:59 UTC: naive UTC, no zone shift
+    assert goal.json()["deadline"].startswith("2026-12-31T20:59")

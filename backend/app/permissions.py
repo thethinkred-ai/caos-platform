@@ -52,7 +52,7 @@ def user_can(db: Session, user: User, goal: Goal, capability: str) -> bool:
         return True
     # INV-7: an active delegation grants the capability for its scope and
     # term only — never permanently.
-    now = datetime.now(UTC)
+    now = datetime.now(UTC).replace(tzinfo=None)  # naive UTC, like the columns
     delegation = db.scalar(
         select(Delegation.id).where(
             Delegation.recipient_id == user.id,

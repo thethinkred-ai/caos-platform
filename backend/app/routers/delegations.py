@@ -30,6 +30,7 @@ DELEGATABLE = {"coordinate", "transition", "verify_result"}
 
 
 def _is_active(delegation: Delegation, now: datetime) -> bool:
+    """`now` must be naive UTC (DB columns are timestamp-without-zone)."""
     return (
         delegation.revoked_at is None
         and delegation.valid_from <= now
@@ -53,7 +54,7 @@ def list_delegations(goal_id: int, db: Db, user: CurrentUser) -> list[dict]:
         .where(Delegation.goal_id == goal_id)
         .order_by(Delegation.created_at.desc())
     ).all()
-    now = datetime.now(UTC)
+    now = datetime.now(UTC).replace(tzinfo=None)
     result = []
     for delegation, recipient_name, issuer_name in rows:
         item = DelegationOut.model_validate(delegation).model_dump(mode="json")
@@ -79,7 +80,7 @@ def create_delegation(goal_id: int, payload: DelegationCreate, db: Db, user: Cur
         raise HTTPException(status_code=422, detail="You cannot delegate to yourself")
     if not db.get(User, payload.recipient_id):
         raise HTTPException(status_code=404, detail="Recipient user not found")
-    now = datetime.now(UTC)
+    now = datetime.now(UTC).replace(tzinfo=None)  # columns are naive UTC
     if payload.valid_until <= now:
         raise HTTPException(status_code=422, detail="valid_until must be in the future")
 
