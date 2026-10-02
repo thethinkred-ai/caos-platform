@@ -35,16 +35,24 @@ import httpx
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Create the ThinkRed project structure in CAOS")
     parser.add_argument("--url", default="https://api-caos.thinkred.ru/api/v1")
-    parser.add_argument("--email", required=True)
-    parser.add_argument("--password", required=True)
-    return parser.parse_args()
+    parser.add_argument("--email", help="email+password login")
+    parser.add_argument("--password")
+    parser.add_argument("--token", help="one-time access token (Bearer), alternative to email/password")
+    args = parser.parse_args()
+    if not args.token and not (args.email and args.password):
+        parser.error("either --token or both --email and --password are required")
+    return args
 
 
 class Caos:
-    def __init__(self, base_url: str, email: str, password: str) -> None:
-        self.client = httpx.Client(base_url=base_url, timeout=30)
-        response = self.client.post("/auth/login", json={"email": email, "password": password})
-        response.raise_for_status()
+    def __init__(self, base_url: str, email: str | None, password: str | None, token: str | None) -> None:
+        headers = {}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        self.client = httpx.Client(base_url=base_url, timeout=30, headers=headers)
+        if not token:
+            response = self.client.post("/auth/login", json={"email": email, "password": password})
+            response.raise_for_status()
         me = self.client.get("/auth/me")
         me.raise_for_status()
         self.user = me.json()
@@ -107,7 +115,7 @@ class Caos:
 
 def main() -> int:
     args = parse_args()
-    caos = Caos(args.url, args.email, args.password)
+    caos = Caos(args.url, args.email, args.password, args.token)
     year_end = (datetime.utcnow() + timedelta(days=90)).strftime("%Y-%m-%dT23:59:00Z")
 
     print("\n[1/5] Проблема-основание")
