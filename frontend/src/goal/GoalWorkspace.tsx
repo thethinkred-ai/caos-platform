@@ -360,7 +360,15 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
             <h2>{goal.title}</h2>
             <p className="muted">{goal.description}</p>
             <small>
-              <CaosStatus status={goal.status} label={`статус: ${statusLabel(goal.status, "goal")}`} /> #{goal.id}
+              <CaosStatus status={goal.status} label={`статус: ${statusLabel(goal.status, "goal")}`} /> №{goal.id}
+              {goal.deadline && (
+                <>
+                  {" · срок: "}
+                  <span style={new Date(goal.deadline) < new Date() && goal.status !== "verified" && goal.status !== "closed" ? { color: "var(--danger)", fontWeight: 700 } : undefined}>
+                    {new Date(goal.deadline).toLocaleDateString("ru-RU")}
+                  </span>
+                </>
+              )}
             </small>
           </div>
           <button onClick={onBack}>← К списку</button>

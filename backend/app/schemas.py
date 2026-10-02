@@ -99,6 +99,7 @@ class GoalCreate(BaseModel):
     success_criteria: str = Field(default="", max_length=2000)
     required_resources: str = Field(default="", max_length=2000)
     expected_outcome: str = Field(default="", max_length=2000)
+    deadline: datetime | None = None
 
 
 class GoalOut(GoalCreate):
@@ -107,6 +108,7 @@ class GoalOut(GoalCreate):
     status: str
     owner_id: int
     created_at: datetime
+    deadline: datetime | None = None
     sub_goals: list["GoalOut"] = []
 
 
@@ -226,6 +228,7 @@ class TaskCreate(BaseModel):
     description: str = ""
     assignee_id: int | None = None
     commitment_id: int | None = None
+    deadline: datetime | None = None
     competence_requirements: list[str] | None = None
 
 

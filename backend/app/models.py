@@ -146,6 +146,7 @@ class Goal(Base):
     success_criteria: Mapped[str] = mapped_column(Text, default="")
     required_resources: Mapped[str] = mapped_column(Text, default="")
     expected_outcome: Mapped[str] = mapped_column(Text, default="")
+    deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     problem: Mapped[Problem | None] = relationship(back_populates="goals")
@@ -513,6 +514,7 @@ class Task(Base):
     status: Mapped[str] = mapped_column(String(30), default="todo", index=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"))
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     commitment_id: Mapped[int | None] = mapped_column(ForeignKey("commitments.id"), nullable=True, index=True)
     competence_requirements: Mapped[JSON | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

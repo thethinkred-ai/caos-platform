@@ -222,3 +222,25 @@ def test_problem_versions_and_qualification(client, outbox):
 
     bad = owner.post(f"/api/v1/problems/{problem_id}/qualify", json={"status": "harness"})
     assert bad.status_code == 422
+
+
+def test_goal_and_task_deadlines_roundtrip(client, outbox):
+    owner, _ = _authed_user(client, outbox, "dl@example.com", "Deadline Owner")
+    goal = owner.post(
+        "/api/v1/goals",
+        json={
+            "title": "Цель со сроком",
+            "description": "Проверка дедлайнов",
+            "deadline": "2026-12-31T00:00:00Z",
+        },
+    )
+    assert goal.status_code == 201, goal.text
+    assert goal.json()["deadline"] is not None
+
+    project = owner.post("/api/v1/projects", json={"title": "Проект со сроками", "description": "D", "goal_id": goal.json()["id"]}).json()
+    task = owner.post(
+        f"/api/v1/projects/{project['id']}/tasks",
+        json={"title": "Задача со сроком", "description": "", "deadline": "2026-11-15T12:00:00Z"},
+    )
+    assert task.status_code == 201, task.text
+    assert task.json()["deadline"] is not None

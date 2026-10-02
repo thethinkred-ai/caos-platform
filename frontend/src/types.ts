@@ -1,6 +1,6 @@
 export type User = { id: number; email: string; display_name: string; bio: string; profile_visibility: string; ai_consent: boolean };
 export type Problem = { id: number; title: string; description: string; status: string; author_id: number; current_state: string; scope: string };
-export type Goal = { id: number; title: string; description: string; status: string; problem_id: number | null; parent_goal_id: number | null; owner_id: number };
+export type Goal = { id: number; title: string; description: string; status: string; problem_id: number | null; parent_goal_id: number | null; owner_id: number; deadline: string | null };
 export type Project = { id: number; title: string; description: string; status: string; goal_id: number | null; owner_id: number; knowledge_count: number };
 
 export type Team = { id: number; name: string; description: string; owner_id: number };
@@ -11,7 +11,7 @@ export type NextAction = { label: string; section: string; reason: string };
 export type Notification = { id: number; user_id: number; entity_type: string; entity_id: number; message: string; is_read: boolean; created_at: string };
 export type AuditEvent = { id: number; actor_id: number; entity_type: string; entity_id: number; action: string; detail: string; created_at: string };
 export type Competence = { id: number; user_id: number; name: string; level: number; description: string; created_at: string; evidence_count: number };
-export type Task = { id: number; title: string; description: string; status: string; project_id: number; assignee_id: number | null; assignee_name: string | null; commitment_id: number | null; created_at: string };
+export type Task = { id: number; title: string; description: string; status: string; project_id: number; assignee_id: number | null; assignee_name: string | null; commitment_id: number | null; deadline: string | null; created_at: string };
 export type SearchResults = { problems: Problem[]; goals: Goal[]; projects: Project[]; knowledge: KnowledgeItem[]; decisions: Decision[] };
 
 // --- v0.2 domain types ---

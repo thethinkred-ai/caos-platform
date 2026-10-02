@@ -26,6 +26,7 @@ export function NewGoalWizard({
   const [parentGoalId, setParentGoalId] = useState("");
   const [criterionName, setCriterionName] = useState("");
   const [criterionTarget, setCriterionTarget] = useState("");
+  const [deadline, setDeadline] = useState("");
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -42,6 +43,7 @@ export function NewGoalWizard({
           description,
           problem_id: problemId ? Number(problemId) : null,
           parent_goal_id: parentGoalId ? Number(parentGoalId) : null,
+          deadline: deadline ? new Date(deadline).toISOString() : null,
         }),
       });
       if (criterionName.trim()) {
@@ -56,6 +58,7 @@ export function NewGoalWizard({
       setParentGoalId("");
       setCriterionName("");
       setCriterionTarget("");
+      setDeadline("");
       setStep(0);
       onCreated(goal.id);
     } catch (err) {
@@ -135,6 +138,12 @@ export function NewGoalWizard({
             placeholder="Целевое значение (78%)"
             value={criterionTarget}
             onChange={(e) => setCriterionTarget(e.target.value)}
+          />
+          <input
+            type="date"
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+            title="Срок цели (необязательно)"
           />
           <LearningHint>
             Без проверяемого критерия цель остаётся пожеланием: система не сможет отличить «задачи
