@@ -46,6 +46,19 @@ export default function AppNew() {
   const workspaceGoalId = route.goalId;
   const goSection = (target: Section) => navigate(target);
 
+  const refreshNotifications = async () => {
+    try {
+      setNotifications(await request<Notification[]>("/notifications"));
+    } catch {
+      /* the badge/list keep their previous state */
+    }
+  };
+
+  useEffect(() => {
+    if (route.section === "notifications") void refreshNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.section]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
@@ -301,7 +314,7 @@ export default function AppNew() {
   const markNotificationRead = async (notificationId: number) => {
     try {
       await request(`/notifications/${notificationId}/read`, { method: "PATCH" });
-      await loadData();
+      setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка");
     }
@@ -310,7 +323,7 @@ export default function AppNew() {
   const markAllNotificationsRead = async () => {
     try {
       await request("/notifications/read-all", { method: "PATCH" });
-      await loadData();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка");
     }
@@ -687,6 +700,7 @@ export default function AppNew() {
           goals={goals}
           user={user}
           onBack={() => goSection("goals")}
+          onNotice={() => void refreshNotifications()}
         />
       )}
       {isCatalog && !(section === "goals" && workspaceGoalId !== null) && (
@@ -1060,6 +1074,16 @@ export default function AppNew() {
             stepikCourses={stepikCourses}
             onUpdated={(updated) => setUser(updated)}
             onError={(message) => setError(message)}
+          />
+        )}
+
+        {section === "notifications" && (
+          <NotificationsPanel
+            notifications={notifications}
+            onOpenGoal={(id) => goGoal(id)}
+            onGoSection={(target) => goSection(target)}
+            onMarkRead={(id) => void markNotificationRead(id)}
+            onMarkAllRead={() => void markAllNotificationsRead()}
           />
         )}
 

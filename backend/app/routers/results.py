@@ -18,6 +18,7 @@ from ..errors import DomainError, RESULT_ALREADY_VERIFIED, SELF_VERIFICATION_FOR
 from ..permissions import require_capability
 from ..deps import current_user
 from ..models import AuditEvent, Evidence, GoalCriterion, GoalMeasurement, Notification, Result, User, Verification
+from ..ru import RESULT_STATUS, ru
 from ..schemas import (
     EvidenceCreate, EvidenceOut, GoalCriterionCreate, GoalCriterionOut,
     GoalMeasurementCreate, GoalMeasurementOut, ResultCreate, ResultOut, ResultVerify,
@@ -195,7 +196,7 @@ def verify_result(result_id: int, payload: ResultVerify, db: Db, user: CurrentUs
     ))
     db.add(Notification(
         user_id=result.reported_by, entity_type="result", entity_id=result_id,
-        message=f"Your result '{result.description[:60]}' is now {payload.status}",
+        message=f"Ваш результат «{result.description[:60]}» — {ru(RESULT_STATUS, payload.status)}",
     ))
     db.commit()
     db.refresh(result)

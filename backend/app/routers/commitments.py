@@ -16,6 +16,7 @@ from ..db import get_db
 from ..errors import DomainError, FORBIDDEN_SCOPE, INVALID_STATE_TRANSITION
 from ..deps import current_user
 from ..models import AuditEvent, Commitment, GoalParticipation, Notification, User, UserProfile
+from ..ru import COMMITMENT_STATUS, ru
 from ..schemas import CommitmentCreate, CommitmentStatusUpdate
 
 router = APIRouter()
@@ -126,7 +127,7 @@ def update_commitment_status(
     ))
     db.add(Notification(
         user_id=user.id, entity_type="commitment", entity_id=commitment_id,
-        message=f"Commitment '{commitment.description[:60]}' is now {payload.status}",
+        message=f"Обязательство «{commitment.description[:60]}» — {ru(COMMITMENT_STATUS, payload.status)}",
     ))
     db.commit()
     return _out(commitment, user.display_name)

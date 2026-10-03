@@ -65,7 +65,7 @@ const COMMITMENT_LABELS: Record<string, string> = {
   withdrawn: "Снято",
 };
 
-export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number; goals: Goal[]; user: User; onBack: () => void }) {
+export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalId: number; goals: Goal[]; user: User; onBack: () => void; onNotice?: () => void }) {
   const [goal, setGoal] = useState<Goal | null>(goals.find((g) => g.id === goalId) ?? null);
   const [impact, setImpact] = useState<GoalImpact | null>(null);
   const [relations, setRelations] = useState<GoalRelation[]>([]);
@@ -176,6 +176,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack }: { goalId: number;
       setError(e instanceof Error ? e.message : "Действие не удалось");
     } finally {
       setBusy(false);
+      onNotice?.();
     }
   };
 

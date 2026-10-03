@@ -9,6 +9,7 @@ from ..errors import DomainError, INVALID_STATE_TRANSITION
 from ..db import get_db
 from ..deps import current_user
 from ..models import AuditEvent, Commitment, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, ProblemVersion, Project, ProjectGoal, ProjectMember, ProposalVersion, Task, Team, TeamMember, User, UserProfile, Vote
+from ..ru import DECISION_EVENT, PROJECT_STATUS, ru
 from ..schemas import AuditEventOut, DecisionCreate, DecisionEventCreate, DecisionEventOut, DecisionOut, GoalCreate, GoalOut, MemberCreate, MemberOut, ProblemCreate, ProblemOut, ProblemQualify, ProblemUpdate, ProblemVersionOut, ProjectCreate, ProjectMemberOut, ProjectOut, ProjectStatusUpdate, TaskAssign, TaskCreate, TaskOut, TeamCreate, TeamOut, ProposalVersionOut, VoteCreate, VoteOut, VoteSummary
 
 router = APIRouter()
@@ -197,7 +198,7 @@ def add_decision_event(decision_id: int, payload: DecisionEventCreate, db: Db, u
             content=payload.content, author_id=user.id,
         ))
     db.add(AuditEvent(actor_id=user.id, entity_type="decision", entity_id=decision_id, action=payload.event_type, detail=decision.title))
-    db.add(Notification(user_id=user.id, entity_type="decision", entity_id=decision_id, message=f"Decision '{decision.title}' {payload.event_type}"))
+    db.add(Notification(user_id=user.id, entity_type="decision", entity_id=decision_id, message=f"Решение «{decision.title}»: {ru(DECISION_EVENT, payload.event_type)}"))
     db.commit()
     db.refresh(event)
     return event
@@ -251,7 +252,7 @@ def update_project_status(project_id: int, payload: ProjectStatusUpdate, db: Db,
         raise HTTPException(status_code=422, detail=f"Invalid status. Valid: {valid}")
     project.status = payload.status
     db.add(AuditEvent(actor_id=user.id, entity_type="project", entity_id=project_id, action=payload.status, detail=project.title))
-    db.add(Notification(user_id=user.id, entity_type="project", entity_id=project_id, message=f"Project '{project.title}' status changed to {payload.status}"))
+    db.add(Notification(user_id=user.id, entity_type="project", entity_id=project_id, message=f"Проект «{project.title}» — {ru(PROJECT_STATUS, payload.status)}"))
     db.commit()
     db.refresh(project)
     return project
@@ -381,7 +382,7 @@ def complete_task(task_id: int, db: Db, user: CurrentUser) -> Task:
         raise HTTPException(status_code=403, detail="Project membership required")
     item.status = "done"
     db.add(AuditEvent(actor_id=user.id, entity_type="task", entity_id=task_id, action="completed", detail=item.title))
-    db.add(Notification(user_id=user.id, entity_type="task", entity_id=task_id, message=f"Task '{item.title}' completed"))
+    db.add(Notification(user_id=user.id, entity_type="task", entity_id=task_id, message=f"Задача «{item.title}» завершена"))
     db.commit()
     db.refresh(item)
     return item
@@ -410,7 +411,7 @@ def assign_task(task_id: int, payload: TaskAssign, db: Db, user: CurrentUser) ->
     item.assignee_id = payload.assignee_id
     db.add(AuditEvent(actor_id=user.id, entity_type="task", entity_id=task_id, action="assigned", detail=item.title))
     if payload.assignee_id is not None:
-        db.add(Notification(user_id=payload.assignee_id, entity_type="task", entity_id=task_id, message=f"Task '{item.title}' assigned to you"))
+        db.add(Notification(user_id=payload.assignee_id, entity_type="task", entity_id=task_id, message=f"Вам назначена задача «{item.title}»"))
     db.commit()
     db.refresh(item)
     return item
@@ -514,7 +515,7 @@ def finalize_decision(decision_id: int, db: Db, user: CurrentUser) -> Decision:
         accepted = accept_count > reject_count
     decision.status = "accepted" if accepted else "rejected"
     db.add(AuditEvent(actor_id=user.id, entity_type="decision", entity_id=decision_id, action="finalized", detail=decision.status))
-    db.add(Notification(user_id=decision.author_id, entity_type="decision", entity_id=decision_id, message=f"Decision '{decision.title}' {decision.status}"))
+    db.add(Notification(user_id=decision.author_id, entity_type="decision", entity_id=decision_id, message=f"Решение «{decision.title}» — {ru(DECISION_EVENT, decision.status)}"))
     db.commit()
     db.refresh(decision)
     return decision

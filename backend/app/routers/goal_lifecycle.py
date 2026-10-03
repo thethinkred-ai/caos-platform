@@ -22,6 +22,7 @@ from ..permissions import (
     has_multiple_participants,
     require_capability,
 )
+from ..ru import GOAL_STATUS, ru
 from ..schemas import GoalOut, GoalTransition
 
 router = APIRouter()
@@ -98,7 +99,7 @@ def transition_goal(goal_id: int, payload: GoalTransition, db: Db, user: Current
     ))
     db.add(Notification(
         user_id=user.id, entity_type="goal", entity_id=goal.id,
-        message=f"Goal '{goal.title}' is now {target}",
+        message=f"Цель «{goal.title}» — теперь {ru(GOAL_STATUS, target)}",
     ))
     db.commit()
     db.refresh(goal)
