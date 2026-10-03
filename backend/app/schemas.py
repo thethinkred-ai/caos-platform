@@ -102,6 +102,16 @@ class ProblemQualify(BaseModel):
     status: str = Field(pattern="^(qualified|rejected|deferred)$")
 
 
+class GoalUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=3, max_length=200)
+    description: str | None = Field(default=None, min_length=1, max_length=5000)
+    success_criteria: str | None = Field(default=None, max_length=2000)
+    required_resources: str | None = Field(default=None, max_length=2000)
+    expected_outcome: str | None = Field(default=None, max_length=2000)
+    deadline: datetime | None = None
+    _utc_deadline = field_validator("deadline")(_naive_utc)
+
+
 class GoalCreate(BaseModel):
     _utc_deadline = field_validator("deadline")(_naive_utc)
     title: str = Field(min_length=3, max_length=200)

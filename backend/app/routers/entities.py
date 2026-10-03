@@ -10,7 +10,7 @@ from ..db import get_db
 from ..deps import current_user
 from ..models import AuditEvent, Commitment, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, ProblemVersion, Project, ProjectGoal, ProjectMember, ProposalVersion, Task, Team, TeamMember, User, UserProfile, Vote
 from ..ru import DECISION_EVENT, PROJECT_STATUS, ru
-from ..schemas import AuditEventOut, DecisionCreate, DecisionEventCreate, DecisionEventOut, DecisionOut, GoalCreate, GoalOut, MemberCreate, MemberOut, ProblemCreate, ProblemOut, ProblemQualify, ProblemUpdate, ProblemVersionOut, ProjectCreate, ProjectMemberOut, ProjectOut, ProjectStatusUpdate, TaskAssign, TaskCreate, TaskOut, TeamCreate, TeamOut, ProposalVersionOut, VoteCreate, VoteOut, VoteSummary
+from ..schemas import AuditEventOut, DecisionCreate, DecisionEventCreate, DecisionEventOut, DecisionOut, GoalCreate, GoalOut, GoalUpdate, MemberCreate, MemberOut, ProblemCreate, ProblemOut, ProblemQualify, ProblemUpdate, ProblemVersionOut, ProjectCreate, ProjectMemberOut, ProjectOut, ProjectStatusUpdate, TaskAssign, TaskCreate, TaskOut, TeamCreate, TeamOut, ProposalVersionOut, VoteCreate, VoteOut, VoteSummary
 
 router = APIRouter()
 Db = Annotated[Session, Depends(get_db)]
@@ -136,6 +136,24 @@ def create_goal(payload: GoalCreate, db: Db, user: CurrentUser) -> Goal:
     db.commit()
     db.refresh(item)
     return item
+
+
+@router.patch("/goals/{goal_id}", response_model=GoalOut)
+def update_goal(goal_id: int, payload: GoalUpdate, db: Db, user: CurrentUser) -> Goal:
+    """Edit a goal's formulation. Owner or coordinator (capability
+    'edit'); the change lands in the audit trail."""
+    goal = require_goal(db, user.id, goal_id)
+    from ..permissions import require_capability
+    require_capability(db, user, goal, "edit")
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=422, detail="Nothing to update")
+    for field, value in updates.items():
+        setattr(goal, field, value)
+    db.add(AuditEvent(actor_id=user.id, entity_type="goal", entity_id=goal_id, action="updated", detail=", ".join(updates.keys())))
+    db.commit()
+    db.refresh(goal)
+    return goal
 
 
 @router.get("/goals/{goal_id}/sub-goals", response_model=list[GoalOut])

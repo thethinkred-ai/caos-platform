@@ -82,6 +82,10 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
   const [activities, setActivities] = useState<Activity[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
   const [activityType, setActivityType] = useState("task");
   const [activityTitle, setActivityTitle] = useState("");
   const [evaluations, setEvaluations] = useState<Record<number, Evaluation[]>>({});
@@ -266,6 +270,28 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
   const verifyResult = (resultId: number, status: string) =>
     act(() => request(`/results/${resultId}/verify`, { method: "POST", body: JSON.stringify({ status, rationale: "Проверено в интерфейсе цели" }) }));
 
+  const saveGoalEdit = () => {
+    if (!editTitle.trim()) return;
+    void act(async () => {
+      await request(`/goals/${goalId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: editTitle,
+          description: editDescription,
+          deadline: editDeadline ? new Date(editDeadline).toISOString() : null,
+        }),
+      });
+      setEditing(false);
+    });
+  };
+
+  const startEditing = () => {
+    setEditTitle(goal?.title ?? "");
+    setEditDescription(goal?.description ?? "");
+    setEditDeadline(goal?.deadline ? goal.deadline.slice(0, 10) : "");
+    setEditing(true);
+  };
+
   const createDelegation = () => {
     if (!delegRecipient || !delegReason.trim() || !delegUntil) return;
     void act(async () => {
@@ -372,8 +398,30 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
               )}
             </small>
           </div>
-          <button onClick={onBack}>← К списку</button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {(isOwner || myParticipation?.role === "coordinator") && !editing && (
+              <button className="link-button" onClick={startEditing}>
+                ✏️ Изменить
+              </button>
+            )}
+            <button onClick={onBack}>← К списку</button>
+          </div>
         </div>
+        {editing && (
+          <div className="problem-form" style={{ marginTop: 10 }}>
+            <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required minLength={3} />
+            <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} required />
+            <input type="date" value={editDeadline} onChange={(e) => setEditDeadline(e.target.value)} title="Срок цели" />
+            <div className="event-buttons">
+              <button className="primary" disabled={busy} onClick={saveGoalEdit}>
+                Сохранить
+              </button>
+              <button disabled={busy} onClick={() => setEditing(false)}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        )}
         <div className="event-buttons" style={{ marginTop: 10 }} data-tour="goal-lifecycle">
           {lifecycle.map(({ label, from }) => (
             <button key={from[0]} className="primary" disabled={busy} onClick={() => transition(from[0])}>

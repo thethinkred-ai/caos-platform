@@ -259,3 +259,22 @@ def test_timezone_aware_deadline_stored_as_naive_utc(client, outbox):
     assert goal.status_code == 201
     # +03:00 23:59 == 20:59 UTC: naive UTC, no zone shift
     assert goal.json()["deadline"].startswith("2026-12-31T20:59")
+
+
+def test_goal_edit_by_owner_denied_for_stranger(client, outbox):
+    owner, _ = _authed_user(client, outbox, "ge@example.com", "Goal Editor")
+    stranger, _ = _authed_user(client, outbox, "gestranger@example.com", "Stranger")
+    goal = owner.post("/api/v1/goals", json={"title": "создать непрерывный цикл", "description": "D"}).json()
+
+    fixed = owner.patch(f"/api/v1/goals/{goal['id']}", json={"title": "Создать непрерывный цикл"})
+    assert fixed.status_code == 200, fixed.text
+    assert fixed.json()["title"] == "Создать непрерывный цикл"
+
+    denied = stranger.patch(f"/api/v1/goals/{goal['id']}", json={"title": "Перехват"})
+    assert denied.status_code == 403
+
+    empty = owner.patch(f"/api/v1/goals/{goal['id']}", json={})
+    assert empty.status_code == 422
+
+    audit = owner.get("/api/v1/audit").json()
+    assert any(e["action"] == "updated" and e["entity_id"] == goal["id"] for e in audit)
