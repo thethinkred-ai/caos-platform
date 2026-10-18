@@ -29,6 +29,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 Db = Annotated[Session, Depends(get_db)]
 
+
+@router.get("/providers")
+def auth_providers() -> dict[str, bool]:
+    """Which OAuth providers are configured — the login screen renders only those."""
+    s = get_settings()
+    return {
+        "stepik": bool(s.stepik_client_id and s.stepik_client_secret),
+        "yandex": bool(s.yandex_client_id and s.yandex_client_secret),
+        "vk": bool(s.vk_client_id and s.vk_client_secret),
+        "google": bool(s.google_client_id and s.google_client_secret),
+    }
+
+
 _REGISTERED_MESSAGE = {"message": "Account created. Check your email for a verification link."}
 
 

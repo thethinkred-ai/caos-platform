@@ -30,9 +30,10 @@
 .stepik-login-section{margin-top:24px}
 .stepik-login-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px 18px;border-radius:10px;background:var(--primary-strong);color: var(--on-primary);font-weight:600;font-size:15px;text-decoration:none;transition:background .2s}
 .stepik-login-btn:hover{background:var(--primary-deep)}
-.google-login-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px 18px;border-radius:10px;background:var(--surface);color:var(--text-secondary);font-weight:600;font-size:15px;text-decoration:none;border:1px solid var(--border);transition:background .2s;margin-top:10px}
-.google-login-btn:hover{background:var(--surface-muted)}
-.google-icon{display:grid;place-items:center;width:28px;height:28px;background:#4285f4;color: var(--on-primary);border-radius:7px;font:700 16px 'Space Grotesk';flex-shrink:0}
+.oauth-login-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px 18px;border-radius:10px;background:var(--surface);color:var(--text-secondary);font-weight:600;font-size:15px;text-decoration:none;border:1px solid var(--border);transition:background .2s;margin-top:10px}
+.oauth-login-btn:hover{background:var(--surface-muted)}
+.yandex-icon{display:grid;place-items:center;width:28px;height:28px;background:#fc3f1d;color:var(--on-primary);border-radius:7px;font:700 15px 'Space Grotesk';flex-shrink:0}
+.vk-icon{display:grid;place-items:center;width:28px;height:28px;background:#0077ff;color:var(--on-primary);border-radius:7px;font:700 12px 'Space Grotesk';flex-shrink:0}
 .stepik-icon{display:grid;place-items:center;width:28px;height:28px;background:var(--surface);color:var(--primary-strong);border-radius:7px;font:700 16px 'Space Grotesk';flex-shrink:0}
 .auth-divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--text-muted);font-size:var(--font-small)}
 .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border-subtle)}

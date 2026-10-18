@@ -24,6 +24,12 @@ services:
       STEPIK_CLIENT_SECRET: ${STEPIK_CLIENT_SECRET:-}
       STEPIK_REDIRECT_URI: ${STEPIK_REDIRECT_URI:-http://localhost:8000/api/v1/auth/stepik/callback}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID:-}
+      YANDEX_CLIENT_SECRET: ${YANDEX_CLIENT_SECRET:-}
+      YANDEX_REDIRECT_URI: ${YANDEX_REDIRECT_URI:-http://localhost:8000/api/v1/auth/yandex/callback}
+      VK_CLIENT_ID: ${VK_CLIENT_ID:-}
+      VK_CLIENT_SECRET: ${VK_CLIENT_SECRET:-}
+      VK_REDIRECT_URI: ${VK_REDIRECT_URI:-http://localhost:8000/api/v1/auth/vk/callback}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/v1/auth/google/callback}

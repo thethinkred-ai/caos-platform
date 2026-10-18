@@ -1,8 +1,10 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { API_URL, request } from "../api/client";
 import type { User } from "../types";
 
-/** Entry screen: OAuth (Stepik/Google) or email+password. The 0.2 message
+type Providers = { stepik: boolean; yandex: boolean; vk: boolean; google: boolean };
+
+/** Entry screen: OAuth (Stepik / Яндекс / ВКонтакте) или email+пароль. The 0.2 message
  * asks what should change instead of starting from a problem. */
 export function AuthScreen({ notice, onAuthenticated }: { notice?: string; onAuthenticated: (user: User) => void }) {
   const [mode, setMode] = useState<"register" | "login">("login");
@@ -11,6 +13,25 @@ export function AuthScreen({ notice, onAuthenticated }: { notice?: string; onAut
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [providers, setProviders] = useState<Providers>({ stepik: true, yandex: false, vk: false, google: false });
+
+  // Какие OAuth-кнопки показывать, решает бэкенд: провайдер без ключей не рендерится,
+  // поэтому «мёртвых» кнопок на экране входа не бывает.
+  useEffect(() => {
+    let alive = true;
+    request<Providers>("/auth/providers")
+      .then((p) => {
+        if (alive) setProviders(p);
+      })
+      .catch(() => {
+        /* оставляем Stepik: он настроен в любом развёртывании */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const anyOAuth = providers.stepik || providers.yandex || providers.vk || providers.google;
 
   const submitAuth = async (event: FormEvent) => {
     event.preventDefault();
@@ -44,17 +65,35 @@ export function AuthScreen({ notice, onAuthenticated }: { notice?: string; onAut
         <span className="eyebrow">CAOS 0.2</span>
         <h1>Что вы хотите изменить?</h1>
         <p className="muted">Формулируйте цели, присоединяйтесь к целям других и доказывайте результат.</p>
-        <div className="stepik-login-section">
-          <a className="stepik-login-btn" href={`${API_URL}/auth/stepik`}>
-            <span className="stepik-icon">S</span>
-            Войти через Stepik
-          </a>
-          <a className="google-login-btn" href={`${API_URL}/auth/google`}>
-            <span className="google-icon">G</span>
-            Войти через Google
-          </a>
-        </div>
-        <div className="auth-divider"><span>или</span></div>
+        {anyOAuth && (
+          <div className="stepik-login-section">
+            {providers.stepik && (
+              <a className="stepik-login-btn" href={`${API_URL}/auth/stepik`}>
+                <span className="stepik-icon">S</span>
+                Войти через Stepik
+              </a>
+            )}
+            {providers.yandex && (
+              <a className="oauth-login-btn yandex-login-btn" href={`${API_URL}/auth/yandex`}>
+                <span className="yandex-icon">Я</span>
+                Войти через Яндекс
+              </a>
+            )}
+            {providers.vk && (
+              <a className="oauth-login-btn vk-login-btn" href={`${API_URL}/auth/vk`}>
+                <span className="vk-icon">VK</span>
+                Войти через ВКонтакте
+              </a>
+            )}
+            {providers.google && (
+              <a className="oauth-login-btn google-login-btn" href={`${API_URL}/auth/google`}>
+                <span className="google-icon">G</span>
+                Войти через Google
+              </a>
+            )}
+          </div>
+        )}
+        {anyOAuth && <div className="auth-divider"><span>или</span></div>}
         <form onSubmit={submitAuth} className="auth-form">
           <h2>{mode === "register" ? "Создать аккаунт" : "Войти"}</h2>
           {mode === "register" && (
