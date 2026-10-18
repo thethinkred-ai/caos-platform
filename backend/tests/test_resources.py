@@ -70,8 +70,8 @@ def test_goal_export_markdown(client, outbox):
         f"/api/v1/goals/{goal['id']}/resources",
         json={"name": "Критический зал", "resource_type": "venue", "is_critical": True},
     )
-    cm = owner.post(f"/api/v1/goals/{goal['id']}/commitments", json={"description": "Пишу программу"}).json()
-    result = owner.post(f"/api/v1/goals/{goal['id']}/results", json={"description": "Программа готова"}).json()
+    owner.post(f"/api/v1/goals/{goal['id']}/commitments", json={"description": "Пишу программу"})
+    owner.post(f"/api/v1/goals/{goal['id']}/results", json={"description": "Программа готова"})
 
     exported = owner.get(f"/api/v1/goals/{goal['id']}/export")
     assert exported.status_code == 200
