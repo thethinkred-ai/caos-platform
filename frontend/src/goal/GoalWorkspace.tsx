@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { request } from "../api/client";
-import { capabilityLabel, kindLabel, relationLabel, roleLabel, CRITERION_LABELS, statusLabel } from "../labels";
+import { API_URL, request } from "../api/client";
+import { capabilityLabel, kindLabel, relationLabel, roleLabel, RESOURCE_STATUS_LABELS, RESOURCE_TYPE_LABELS, CRITERION_LABELS, statusLabel } from "../labels";
 import { LearningHint } from "../ui/LearningHint";
 import { CaosStatus } from "../ui/CaosStatus";
 import {
@@ -21,6 +21,7 @@ import {
   type GoalParticipation,
   type GoalRelation,
   type TimelineEvent,
+  type Resource,
   type ResultItem,
   type User,
 } from "../types";
@@ -82,6 +83,11 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
   const [activities, setActivities] = useState<Activity[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [resourceName, setResourceName] = useState("");
+  const [resourceType, setResourceType] = useState("labor");
+  const [resourceQuantity, setResourceQuantity] = useState("");
+  const [resourceCritical, setResourceCritical] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -117,7 +123,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
 
   const reload = useCallback(async () => {
     try {
-      const [goalData, impactData, relationsData, partsData, commitsData, criteriaData, resultsData, challengesData, explainData, delegationsData, activitiesData, timelineData] =
+      const [goalData, impactData, relationsData, partsData, commitsData, criteriaData, resultsData, challengesData, explainData, delegationsData, activitiesData, resourcesData, timelineData] =
         await Promise.all([
           request<Goal[]>(`/goals`),
           request<GoalImpact>(`/goals/${goalId}/impact`),
@@ -130,6 +136,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
           request<GoalExplain>(`/goals/${goalId}/explain`),
           request<Delegation[]>(`/goals/${goalId}/delegations`),
           request<Activity[]>(`/goals/${goalId}/activities`),
+          request<Resource[]>(`/goals/${goalId}/resources`),
           request<TimelineEvent[]>(`/goals/${goalId}/timeline`),
         ]);
       setGoal(goalData.find((g) => g.id === goalId) ?? null);
@@ -143,6 +150,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
       setExplain(explainData);
       setDelegations(delegationsData);
       setActivities(activitiesData);
+      setResources(resourcesData);
       setTimeline(timelineData);
       setError("");
     } catch (e) {
@@ -285,6 +293,28 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
     });
   };
 
+  const createResource = (e: FormEvent) => {
+    e.preventDefault();
+    if (!resourceName.trim()) return;
+    void act(async () => {
+      await request(`/goals/${goalId}/resources`, {
+        method: "POST",
+        body: JSON.stringify({
+          name: resourceName,
+          resource_type: resourceType,
+          quantity: resourceQuantity,
+          is_critical: resourceCritical,
+        }),
+      });
+      setResourceName("");
+      setResourceQuantity("");
+      setResourceCritical(false);
+    });
+  };
+
+  const patchResource = (id: number, patch: Record<string, unknown>) =>
+    act(() => request(`/resources/${id}`, { method: "PATCH", body: JSON.stringify(patch) }));
+
   const startEditing = () => {
     setEditTitle(goal?.title ?? "");
     setEditDescription(goal?.description ?? "");
@@ -404,6 +434,9 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
                 ✏️ Изменить
               </button>
             )}
+            <a href={`${API_URL}/goals/${goalId}/export`} target="_blank" rel="noopener" className="link-button">
+              ⬇ Экспорт
+            </a>
             <button onClick={onBack}>← К списку</button>
           </div>
         </div>
@@ -787,6 +820,77 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
             Сообщить результат
           </button>
         </form>
+      </section>
+
+      <section className="panel" data-tour="goal-resources">
+        <div className="panel-heading">
+          <div>
+            <span className="eyebrow">Ресурсы</span>
+            <h2>Чем обеспечивается цель</h2>
+          </div>
+          <span className="count">{resources.filter((r) => r.is_critical && r.status !== "secured").length}</span>
+        </div>
+        {resources.length === 0 ? (
+          <p className="muted empty">Ресурсы не указаны — узкое место может быть не в деятельности, а в средствах.</p>
+        ) : (
+          <div className="problem-list">
+            {resources.map((r) => (
+              <article key={r.id}>
+                <span className="problem-icon">{r.is_critical && r.status !== "secured" ? "⚠️" : "◈"}</span>
+                <div>
+                  <h3>
+                    {r.name}
+                    {r.quantity && ` — ${r.quantity} ${r.unit}`.trimEnd()}
+                  </h3>
+                  <small>
+                    <span className="event-type-badge">{RESOURCE_TYPE_LABELS[r.resource_type] ?? r.resource_type}</span>{" "}
+                    <span style={r.is_critical && r.status !== "secured" ? { color: "var(--danger)", fontWeight: 700 } : undefined}>
+                      {RESOURCE_STATUS_LABELS[r.status] ?? r.status}
+                      {r.is_critical && " · критический"}
+                    </span>
+                  </small>
+                  {(isOwner || myParticipation?.role === "coordinator") && (
+                    <div className="event-buttons" style={{ marginTop: 4 }}>
+                      {r.status === "required" && (
+                        <button className="primary" disabled={busy} onClick={() => patchResource(r.id, { status: "secured" })}>
+                          Обеспечен
+                        </button>
+                      )}
+                      {r.status === "secured" && (
+                        <button disabled={busy} onClick={() => patchResource(r.id, { status: "consumed" })}>
+                          Израсходован
+                        </button>
+                      )}
+                      <button disabled={busy} onClick={() => patchResource(r.id, { is_critical: !r.is_critical })}>
+                        {r.is_critical ? "Снять критичность" : "Отметить критическим"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+        {(isOwner || myParticipation?.role === "coordinator") && (
+          <form onSubmit={createResource} className="problem-form">
+            <input placeholder="Ресурс (зал, преподаватель, станок…)" value={resourceName} onChange={(e) => setResourceName(e.target.value)} required minLength={3} />
+            <select value={resourceType} onChange={(e) => setResourceType(e.target.value)}>
+              {Object.entries(RESOURCE_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <input placeholder="Количество (1, 30, 40 ч/мес)" value={resourceQuantity} onChange={(e) => setResourceQuantity(e.target.value)} />
+            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="checkbox" checked={resourceCritical} onChange={(e) => setResourceCritical(e.target.checked)} />
+              <span>критический (узкое место цели)</span>
+            </label>
+            <button className="primary" type="submit" disabled={busy}>
+              Добавить ресурс
+            </button>
+          </form>
+        )}
       </section>
 
       <section className="panel" data-tour="goal-activities">

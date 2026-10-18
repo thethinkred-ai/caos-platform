@@ -16,7 +16,7 @@ from ..access import require_goal
 from ..permissions import require_capability
 from ..db import get_db
 from ..deps import current_user
-from ..models import Activity, AuditEvent, Challenge, Commitment, Decision, Goal, GoalParticipation, GoalRelation, Problem, Project, ProjectGoal, Result, Task, User
+from ..models import Activity, AuditEvent, Challenge, Resource, Commitment, Decision, Goal, GoalParticipation, GoalRelation, Problem, Project, ProjectGoal, Result, Task, User
 from ..schemas import ExplainNode, GoalExplain, GoalImpact, GoalRelationCreate, GoalRelationOut
 
 router = APIRouter()
@@ -138,8 +138,17 @@ def goal_impact(goal_id: int, db: Db, user: CurrentUser) -> GoalImpact:
                 queue.append(dependent)
     transitive = reachable - dependents
 
+    critical_resources = db.scalar(
+        select(Resource.id).where(
+            Resource.goal_id == goal_id,
+            Resource.is_critical.is_(True),
+            Resource.status != "secured",
+        ).limit(1)
+    ) is not None
+
     return GoalImpact(
         goal_id=goal_id,
+        critical_resources=1 if critical_resources else 0,
         direct_dependents=len(dependents),
         transitive_dependents=len(transitive),
         supporters=sum(1 for r in relations if r.target_goal_id == goal_id and r.relation_type in ("supports", "contributes_to")),
@@ -189,6 +198,13 @@ def explain_goal(goal_id: int, db: Db, user: CurrentUser) -> GoalExplain:
     for t in tasks:
         chain.append(ExplainNode(kind="task", id=t.id, title=t.title, status=t.status))
 
+    resources_chain = list(db.scalars(select(Resource).where(Resource.goal_id == goal_id).order_by(Resource.created_at)))
+    for r in resources_chain:
+        chain.append(ExplainNode(
+            kind="resource", id=r.id, title=r.name[:120], status=r.status,
+            detail=(f"критический: {r.quantity} {r.unit}".strip() if r.is_critical else f"{r.quantity} {r.unit}".strip()),
+        ))
+
     activities = list(db.scalars(select(Activity).where(Activity.goal_id == goal_id).order_by(Activity.created_at)))
     for a in activities:
         chain.append(ExplainNode(kind="activity", id=a.id, title=a.title[:120], status=a.status, detail=f"тип: {a.activity_type}"))
@@ -202,6 +218,7 @@ def explain_goal(goal_id: int, db: Db, user: CurrentUser) -> GoalExplain:
         "commitments": len(commitments),
         "tasks": len(tasks),
         "activities": len(activities),
+        "resources": len(resources_chain),
         "results": len(results),
     }
     return GoalExplain(goal_id=goal_id, chain=chain, counts=counts)

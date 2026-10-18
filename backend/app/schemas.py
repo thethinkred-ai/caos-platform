@@ -166,6 +166,7 @@ class GoalImpact(BaseModel):
     """What stops or is affected if this goal fails — the operational
     value of the graph (critique, section 33/51)."""
     goal_id: int
+    critical_resources: int = 0
     direct_dependents: int
     transitive_dependents: int
     supporters: int
@@ -667,3 +668,30 @@ class CompetenceEvidenceOut(CompetenceEvidenceCreate):
     user_id: int
     competence_id: int
     created_at: datetime
+
+
+class ResourceCreate(BaseModel):
+    name: str = Field(min_length=3, max_length=200)
+    resource_type: str = Field(
+        default="other",
+        pattern="^(labor|skill|tool|venue|funding|time|means_of_production|other)$",
+    )
+    description: str = Field(default="", max_length=2000)
+    quantity: str = Field(default="", max_length=100)
+    unit: str = Field(default="", max_length=50)
+    is_critical: bool = False
+
+
+class ResourceOut(ResourceCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    goal_id: int
+    status: str
+    created_by: int
+    created_at: datetime
+
+
+class ResourceUpdate(BaseModel):
+    status: str | None = Field(default=None, pattern="^(required|secured|consumed)$")
+    is_critical: bool | None = None
+    quantity: str | None = Field(default=None, max_length=100)

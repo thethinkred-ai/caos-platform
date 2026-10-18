@@ -108,3 +108,11 @@ export const CONCLUSION_LABELS: Record<string, string> = {
 export const TARGET_LABELS: Record<string, string> = {
   goal: "цель", decision: "решение", result: "результат", problem: "проблема",
 };
+
+export const RESOURCE_TYPE_LABELS: Record<string, string> = {
+  labor: "труд", skill: "навык", tool: "инструмент", venue: "помещение",
+  funding: "финансирование", time: "время", means_of_production: "средство производства", other: "другое",
+};
+export const RESOURCE_STATUS_LABELS: Record<string, string> = {
+  required: "требуется", secured: "обеспечен", consumed: "израсходован",
+};

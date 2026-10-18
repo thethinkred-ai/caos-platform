@@ -46,3 +46,4 @@ export type Activity = { id: number; goal_id: number; commitment_id: number | nu
 export type Evaluation = { id: number; result_id: number; evaluator_id: number; conclusion: string; insight: string; created_at: string };
 export type AISuggestion = { id: number; user_id: number; endpoint: string; suggestion: string; status: string; reason: string; model_name: string; input_snapshot: string; confidence: number | null; proposal_type: string; target_type: string; target_id: number | null; reviewed_by: number | null; reviewed_at: string | null; created_at: string };
 export type TimelineEvent = { kind: string; title: string; status: string; actor_id: number | null; detail: string; created_at: string };
+export type Resource = { id: number; goal_id: number; name: string; resource_type: string; description: string; quantity: string; unit: string; status: string; is_critical: boolean; created_by: number; created_at: string };

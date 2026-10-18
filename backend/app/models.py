@@ -297,6 +297,30 @@ class Verification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+RESOURCE_TYPES = ("labor", "skill", "tool", "venue", "funding", "time", "means_of_production", "other")
+
+
+class Resource(Base):
+    """A resource a goal depends on (external comment 03.10.2026): not
+    every bottleneck is activity - specialized labor, tools, venues,
+    funding. A critical unsecured resource is a bottleneck; allocation
+    itself still goes through people, never automatic."""
+
+    __tablename__ = "resources"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    goal_id: Mapped[int] = mapped_column(ForeignKey("goals.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    resource_type: Mapped[str] = mapped_column(String(30), default="other")
+    description: Mapped[str] = mapped_column(Text, default="")
+    quantity: Mapped[str] = mapped_column(String(100), default="")
+    unit: Mapped[str] = mapped_column(String(50), default="")
+    status: Mapped[str] = mapped_column(String(20), default="required", index=True)  # required / secured / consumed
+    is_critical: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 ACTIVITY_TYPES = ("task", "meeting", "research", "discussion", "decision", "external_action")
 
 
