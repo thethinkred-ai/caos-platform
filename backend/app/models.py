@@ -669,3 +669,26 @@ class AISuggestion(Base):
     reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class Feedback(Base):
+    """Обратная связь пользователя: где застрял, что не так, что исправить.
+
+    Пишется двумя путями: автоматической подсказкой «застрявшему» пользователю
+    (kind=stuck, stage определяется сервером) и кнопкой «Обратная связь»
+    в интерфейсе (kind=idea|bug). Читает рабочая команда.
+    """
+
+    __tablename__ = "feedback"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    message: Mapped[str] = mapped_column(Text)
+    page: Mapped[str] = mapped_column(String(64), default="")
+    kind: Mapped[str] = mapped_column(String(20), default="idea")
+    contact: Mapped[str] = mapped_column(String(255), default="")
+    stage: Mapped[str] = mapped_column(String(40), default="")
+    status: Mapped[str] = mapped_column(String(20), default="new")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

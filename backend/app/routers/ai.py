@@ -8,7 +8,7 @@ from ..access import require_goal, user_goal_ids, user_project_ids
 from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
-from ..llm import is_llm_available, llm_complete_sync
+from ..llm import is_llm_available, llm_complete_sync, llm_source
 from ..models import AISuggestion, AuditEvent, Competence, Decision, DecisionEvent, Goal, KnowledgeItem, Problem, Project, ProjectMember, Task, User
 from ..schemas import AIRecommendation, AISuggestionOut, AISuggestionResolve
 
@@ -124,7 +124,7 @@ def _llm_similar_problems(db: Session, user: User, problem_id: int) -> AIRecomme
     )
     if not answer:
         return _stub_similar_problems(db, user, problem_id)
-    return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
+    return AIRecommendation(suggestion=answer, source=llm_source(), confidence=0.7)
 
 
 def _llm_similar_people(db: Session, user: User) -> AIRecommendation:
@@ -136,7 +136,7 @@ def _llm_similar_people(db: Session, user: User) -> AIRecommendation:
     )
     if not answer:
         return _stub_similar_people(db, user)
-    return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
+    return AIRecommendation(suggestion=answer, source=llm_source(), confidence=0.6)
 
 
 def _llm_find_knowledge(db: Session, user: User, query: str) -> AIRecommendation:
@@ -148,7 +148,7 @@ def _llm_find_knowledge(db: Session, user: User, query: str) -> AIRecommendation
     )
     if not answer:
         return _stub_find_knowledge(db, user, query)
-    return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
+    return AIRecommendation(suggestion=answer, source=llm_source(), confidence=0.7)
 
 
 def _llm_decompose_goal(db: Session, user: User, goal_id: int) -> AIRecommendation:
@@ -163,7 +163,7 @@ def _llm_decompose_goal(db: Session, user: User, goal_id: int) -> AIRecommendati
     )
     if not answer:
         return _stub_decompose_goal(db, user, goal_id)
-    return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
+    return AIRecommendation(suggestion=answer, source=llm_source(), confidence=0.7)
 
 
 @router.get("/recommendations/similar-problems/{problem_id}", response_model=AIRecommendation)
@@ -217,7 +217,7 @@ def _llm_similar_goals(db: Session, user: User, goal_id: int) -> AIRecommendatio
     )
     if not answer:
         return AIRecommendation(suggestion="Похожие цели не найдены.", source="stub", confidence=0.0)
-    return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
+    return AIRecommendation(suggestion=answer, source=llm_source(), confidence=0.7)
 
 
 def _other_visible_goals(db: Session, user: User, goal_id: int) -> list[Goal]:
@@ -238,7 +238,7 @@ def _llm_duplicate_goals(db: Session, user: User, goal_id: int) -> AIRecommendat
     )
     if not answer:
         return AIRecommendation(suggestion="Дубликатов не обнаружено.", source="stub", confidence=0.0)
-    return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
+    return AIRecommendation(suggestion=answer, source=llm_source(), confidence=0.6)
 
 
 def _llm_missing_competences(db: Session, user: User, goal_id: int) -> AIRecommendation:
@@ -271,7 +271,7 @@ def _llm_missing_competences(db: Session, user: User, goal_id: int) -> AIRecomme
     )
     if not answer:
         return AIRecommendation(suggestion="Недостающие компетенции не определены.", source="stub", confidence=0.0)
-    return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
+    return AIRecommendation(suggestion=answer, source=llm_source(), confidence=0.6)
 
 
 def _llm_goal_context(db: Session, user: User, goal_id: int) -> AIRecommendation:
@@ -295,7 +295,7 @@ def _llm_goal_context(db: Session, user: User, goal_id: int) -> AIRecommendation
     )
     if not answer:
         return AIRecommendation(suggestion="Контекст недоступен.", source="stub", confidence=0.0)
-    return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
+    return AIRecommendation(suggestion=answer, source=llm_source(), confidence=0.7)
 
 
 @router.get("/recommendations/similar-goals/{goal_id}", response_model=AIRecommendation)
@@ -404,7 +404,7 @@ def scenario_analysis(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendati
             f"Предложи 3 сценария развития (оптимистичный, реалистичный, пессимистичный) с оценкой рисков.",
         )
         if answer:
-            return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
+            return AIRecommendation(suggestion=answer, source=llm_source(), confidence=0.7)
     return AIRecommendation(suggestion="AI-моделирование сценариев будет подключено после настройки LLM.", source="stub", confidence=0.0)
 
 
@@ -418,7 +418,7 @@ def risk_analysis(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
             f"Проведи анализ рисков: главные угрозы, вероятность, влияние, стратегии снижения.",
         )
         if answer:
-            return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.7)
+            return AIRecommendation(suggestion=answer, source=llm_source(), confidence=0.7)
     return AIRecommendation(suggestion="AI-анализ рисков будет подключён после настройки LLM.", source="stub", confidence=0.0)
 
 
@@ -434,7 +434,7 @@ def goal_conflicts(goal_id: int, db: Db, user: CurrentUser) -> AIRecommendation:
             f"Найди потенциальные конфликты между целями (ресурсы, время, приоритеты).",
         )
         if answer:
-            return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
+            return AIRecommendation(suggestion=answer, source=llm_source(), confidence=0.6)
     return AIRecommendation(suggestion="AI-анализ конфликтов целей будет подключён после настройки LLM.", source="stub", confidence=0.0)
 
 
@@ -451,7 +451,7 @@ def mentoring(db: Db, user: CurrentUser) -> AIRecommendation:
             f"Предложи направления для обучения и наставничества на основе текущего профиля.",
         )
         if answer:
-            return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
+            return AIRecommendation(suggestion=answer, source=llm_source(), confidence=0.6)
     return AIRecommendation(suggestion="AI-рекомендации по обучению будут подключены после настройки LLM.", source="stub", confidence=0.0)
 
 
@@ -466,5 +466,5 @@ def extract_patterns(db: Db, user: CurrentUser) -> AIRecommendation:
             f"Извлеки закономерности в принятии решений: типичные подходы, предпочтения, слепые зоны.",
         )
         if answer:
-            return AIRecommendation(suggestion=answer, source=f"llm:{settings.ai_model}", confidence=0.6)
+            return AIRecommendation(suggestion=answer, source=llm_source(), confidence=0.6)
     return AIRecommendation(suggestion="AI-извлечение закономерностей будет подключено после настройки LLM.", source="stub", confidence=0.0)

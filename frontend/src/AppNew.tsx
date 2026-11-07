@@ -17,6 +17,7 @@ import { statusLabel } from "./labels";
 import { GoalWorkspace } from "./goal/GoalWorkspace";
 import { NewGoalWizard } from "./goal/NewGoalWizard";
 import { CoachTour } from "./tour/CoachTour";
+import { FeedbackWidget } from "./ui/FeedbackWidget";
 import type {
   AuditEvent, Competence, Decision, DecisionEvent, Goal, KnowledgeItem, NextAction,
   Notification, Problem, ProblemVersion, Project, SearchResults, Section, Task, Team, User,
@@ -1097,6 +1098,7 @@ export default function AppNew() {
           />
         )}
       </main>
+      {user && <FeedbackWidget userId={user.id} />}
     </div>
   );
 }
