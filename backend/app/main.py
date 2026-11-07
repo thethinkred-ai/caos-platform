@@ -9,8 +9,9 @@ from slowapi import _rate_limit_exceeded_handler
 from .config import get_settings
 from .db import Base, engine
 from .errors import DomainError
+from .models import Feedback
 from .rate_limit import limiter
-from .routers import activities, ai, auth, challenges, export, resources, vk, yandex, commitments, competences, dashboard, delegations, entities, google, goal_graph, goal_lifecycle, goal_participation, knowledge, links, notifications, profile, results, search, stepik
+from .routers import activities, ai, auth, challenges, export, resources, vk, yandex, commitments, competences, dashboard, delegations, entities, feedback, google, goal_graph, goal_lifecycle, goal_participation, knowledge, links, notifications, profile, results, search, stepik
 
 settings = get_settings()
 
@@ -35,6 +36,20 @@ app = FastAPI(
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.on_event("startup")
+def ensure_feedback_table() -> None:
+    """Таблица обратной связи создаётся идемпотентно.
+
+    Миграции в проде применяются вручную, и сбор обратной связи не должен
+    зависеть от того, прогнали ли их после деплоя. checkfirst делает вызов
+    безопасным при повторном старте.
+    """
+    try:
+        Feedback.__table__.create(bind=engine, checkfirst=True)
+    except Exception:  # noqa: BLE001 — база может быть недоступна в момент старта
+        logger.exception("Не удалось проверить таблицу feedback")
 
 
 @app.exception_handler(Exception)
@@ -101,3 +116,4 @@ app.include_router(vk.router, prefix="/api/v1", tags=["vk"])
 app.include_router(yandex.router, prefix="/api/v1", tags=["yandex"])
 app.include_router(google.router, prefix="/api/v1", tags=["google"])
 app.include_router(profile.router, prefix="/api/v1", tags=["profile"])
+app.include_router(feedback.router, prefix="/api/v1", tags=["feedback"])

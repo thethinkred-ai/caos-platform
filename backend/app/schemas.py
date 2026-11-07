@@ -695,3 +695,35 @@ class ResourceUpdate(BaseModel):
     status: str | None = Field(default=None, pattern="^(required|secured|consumed)$")
     is_critical: bool | None = None
     quantity: str | None = Field(default=None, max_length=100)
+
+
+class FeedbackCreate(BaseModel):
+    message: str = Field(min_length=3, max_length=4000)
+    page: str = Field(default="", max_length=64)
+    kind: str = Field(default="idea", pattern="^(stuck|idea|bug)$")
+    contact: str = Field(default="", max_length=255)
+
+
+class FeedbackOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    message: str
+    page: str
+    kind: str
+    contact: str
+    stage: str
+    status: str
+    created_at: datetime
+
+
+class StuckState(BaseModel):
+    """Ответ детектора «застрял». Отдаётся пользователю, чтобы интерфейс
+    сам предложил написать, что не так, — без ожидания, пока он догадается
+    искать форму обратной связи."""
+
+    stuck: bool
+    stage: str
+    hours_registered: float
+    message: str
+    checklist: list[str]
+    objects: dict[str, int]

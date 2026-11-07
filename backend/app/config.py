@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ai_api_key: str = ""
     ai_base_url: str = "https://api.openai.com/v1"
     ai_model: str = "gpt-4o-mini"
+    ai_fallback_models: str = ""
     stepik_client_id: str = ""
     stepik_client_secret: str = ""
     stepik_redirect_uri: str = "http://localhost:8000/api/v1/auth/stepik/callback"
