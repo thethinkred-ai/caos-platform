@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import os
 import secrets
 from datetime import UTC, datetime, timedelta
 
@@ -107,3 +108,13 @@ def get_refresh_cookie_settings() -> dict:
         "path": "/",
         "max_age": settings.refresh_token_days * 86400,
     }
+
+
+def voter_hash(decision_id: int, user_id: int) -> str:
+    """Stable per-ballot pseudonym: who cast a vote is not stored in
+    plaintext for secret ballots; double-vote prevention and own-vote
+    lookup use this hash instead (harm reduction vs casual DB reads -
+    the operator holding the secret can still map it, see
+    docs/concept/trust-model.md)."""
+    secret = os.environ.get("VOTE_HASH_SECRET") or get_settings().jwt_secret
+    return hmac.new(secret.encode(), f"{decision_id}:{user_id}".encode(), hashlib.sha256).hexdigest()

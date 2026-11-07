@@ -435,6 +435,7 @@ class Decision(Base):
     deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     valid_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     review_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ballot_secret: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     goal: Mapped[Goal | None] = relationship(back_populates="decisions")
@@ -628,12 +629,17 @@ class CompetenceEvidence(Base):
 
 
 class Vote(Base):
+    """Open ballots keep user_id (names visible after the final count);
+    secret ballots (Decision.ballot_secret) store only the voter_hash
+    pseudonym - how a person voted is not readable from the database."""
+
     __tablename__ = "votes"
-    __table_args__ = (UniqueConstraint("decision_id", "user_id", name="uq_vote_decision_user"),)
+    __table_args__ = (UniqueConstraint("decision_id", "voter_hash", name="uq_vote_decision_voter"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     decision_id: Mapped[int] = mapped_column(ForeignKey("decisions.id", ondelete="CASCADE"), index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    voter_hash: Mapped[str] = mapped_column(String(64), index=True)
     variant: Mapped[str] = mapped_column(String(30))
     comment: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

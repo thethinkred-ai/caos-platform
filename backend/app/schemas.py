@@ -195,6 +195,7 @@ class DecisionCreate(BaseModel):
     deadline: datetime | None = None
     valid_until: datetime | None = None
     review_at: datetime | None = None
+    ballot_secret: bool = False
 
 
 class ProposalVersionOut(BaseModel):
@@ -537,7 +538,7 @@ class VoteOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     decision_id: int
-    user_id: int
+    user_id: int | None = None  # None for secret ballots
     variant: str
     comment: str
     created_at: datetime

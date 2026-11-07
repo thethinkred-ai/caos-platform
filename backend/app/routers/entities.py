@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..access import require_goal, user_goal_ids, user_project_ids
 from ..errors import DomainError, INVALID_STATE_TRANSITION
+from ..security import voter_hash
 from ..db import get_db
 from ..deps import current_user
 from ..models import AuditEvent, Commitment, Decision, DecisionEvent, Goal, KnowledgeItem, Notification, Problem, ProblemVersion, Project, ProjectGoal, ProjectMember, ProposalVersion, Task, Team, TeamMember, User, UserProfile, Vote
@@ -475,10 +476,17 @@ def cast_vote(decision_id: int, payload: VoteCreate, db: Db, user: CurrentUser) 
             raise HTTPException(status_code=403, detail="Only the decision author can vote")
     if decision.status not in ("proposed", "in_discussion", "voting"):
         raise HTTPException(status_code=400, detail="Decision is not open for voting")
-    existing = db.scalar(select(Vote).where(Vote.decision_id == decision_id, Vote.user_id == user.id))
+    v_hash = voter_hash(decision_id, user.id)
+    existing = db.scalar(select(Vote).where(Vote.decision_id == decision_id, Vote.voter_hash == v_hash))
     if existing:
         raise HTTPException(status_code=409, detail="Already voted")
-    vote = Vote(decision_id=decision_id, user_id=user.id, variant=payload.variant, comment=payload.comment)
+    vote = Vote(
+        decision_id=decision_id,
+        voter_hash=v_hash,
+        variant=payload.variant,
+        comment=payload.comment,
+        user_id=None if decision.ballot_secret else user.id,
+    )
     db.add(vote)
     db.add(AuditEvent(actor_id=user.id, entity_type="decision", entity_id=decision_id, action="vote", detail=payload.variant))
     db.commit()
@@ -494,7 +502,8 @@ def list_votes(decision_id: int, db: Db, user: CurrentUser) -> VoteSummary:
     if decision.author_id != user.id:
         raise HTTPException(status_code=403, detail="Only decision author can view votes")
     votes = list(db.scalars(select(Vote).where(Vote.decision_id == decision_id)))
-    own = next((v for v in votes if v.user_id == user.id), None)
+    own_hash = voter_hash(decision_id, user.id)
+    own = next((v for v in votes if v.voter_hash == own_hash), None)
     finalized = decision.status in ("accepted", "rejected")
     return VoteSummary(
         accept=sum(1 for v in votes if v.variant == "accept"),
