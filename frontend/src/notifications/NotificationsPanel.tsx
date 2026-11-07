@@ -66,7 +66,7 @@ export function NotificationsPanel({
               const navigable = n.entity_type in TARGET_SECTIONS || n.entity_type === "result";
               return (
                 <article key={n.id} className={n.is_read ? "read" : ""}>
-                  <span className="problem-icon">{n.is_read ? "·" : "!"}</span>
+                  <span className={n.is_read ? "notif-dot read" : "notif-dot"} aria-hidden="true" />
                   <div>
                     <h3>{navigable ? (
                       <button className="link-button" onClick={() => open(n)}>

@@ -19,7 +19,6 @@ export function AuditSection({ auditEvents, loading }: { auditEvents: AuditEvent
           <div className="problem-list">
             {auditEvents.map((ev) => (
               <article key={ev.id} className="audit-entry">
-                <span className="problem-icon">◇</span>
                 <div>
                   <h3>{ev.action}</h3>
                   <p>{ev.detail}</p>

@@ -117,19 +117,21 @@ export function AuthScreen({ notice, onAuthenticated }: { notice?: string; onAut
           </button>
         </form>
         <div className="stepik-courses-preview">
-          <h3>Наши курсы на Stepik:</h3>
-          <a className="course-link" href="https://stepik.org/course/288738" target="_blank" rel="noopener">
-            <span className="course-icon">H</span>
-            Наука логики Гегеля
-          </a>
-          <a className="course-link" href="https://stepik.org/course/288774" target="_blank" rel="noopener">
-            <span className="course-icon">K</span>
-            Капитал Маркса
-          </a>
-          <a className="course-link" href="https://stepik.org/course/285340" target="_blank" rel="noopener">
-            <span className="course-icon">L</span>
-            Ленин «Карл Маркс»
-          </a>
+          <h3>Курсы на Stepik</h3>
+          <div className="stepik-courses-list">
+            <a className="course-link" href="https://stepik.org/course/288738" target="_blank" rel="noopener">
+              Наука логики Гегеля
+              <span className="course-meta">курс</span>
+            </a>
+            <a className="course-link" href="https://stepik.org/course/288774" target="_blank" rel="noopener">
+              Капитал Маркса
+              <span className="course-meta">курс</span>
+            </a>
+            <a className="course-link" href="https://stepik.org/course/285340" target="_blank" rel="noopener">
+              Ленин «Карл Маркс»
+              <span className="course-meta">курс</span>
+            </a>
+          </div>
         </div>
       </div>
     </main>

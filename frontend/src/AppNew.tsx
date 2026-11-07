@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { AIProposalsPanel } from "./ai/AIProposalsPanel";
 import { SkeletonRows } from "./ui/Skeleton";
+import { Icon } from "./ui/Icon";
 import { AuthScreen } from "./auth/AuthScreen";
 import { MyActivity } from "./activity/MyActivity";
 import { AuditSection } from "./audit/AuditSection";
@@ -454,7 +455,6 @@ export default function AppNew() {
           <span className="brand-mark">C</span>
           <span>CAOS</span>
         </div>
-        <p className="side-caption">Collective Activity Operating System</p>
         <nav data-tour="nav">
           {(Object.keys(labels) as Section[]).map((key) => {
             const unreadCount = key === "notifications" ? notifications.filter((n) => !n.is_read).length : 0;
@@ -475,10 +475,10 @@ export default function AppNew() {
         </nav>
         <button
           className="link-button"
-          style={{ marginTop: 8, textAlign: "left" }}
+          style={{ marginTop: 8, textAlign: "left", display: "inline-flex", alignItems: "center", gap: 8 }}
           onClick={() => setTourOpen(true)}
         >
-          ? Обучение интерфейсу
+          <Icon name="help" /> Обучение интерфейсу
         </button>
         <button
           className="logout"
@@ -493,7 +493,6 @@ export default function AppNew() {
       <main className="content">
         <header>
           <div>
-            <span className="eyebrow">Рабочее пространство</span>
             <h1>{labels[section]}</h1>
           </div>
           <div className="avatar">{user.display_name.slice(0, 1).toUpperCase()}</div>
@@ -504,10 +503,19 @@ export default function AppNew() {
             <section className="hero">
               <div>
                 <span className="eyebrow">Главный цикл</span>
-                <h2>Положение дел → Проблема → Цель → Действие → Результат</h2>
+                <h2 className="cycle-chain" aria-label="Положение дел, проблема, цель, действие, результат">
+                  <span>Положение дел</span>
+                  <span className="step-sep">→</span>
+                  <span>Проблема</span>
+                  <span className="step-sep">→</span>
+                  <span className="step-current">Цель</span>
+                  <span className="step-sep">→</span>
+                  <span>Действие</span>
+                  <span className="step-sep">→</span>
+                  <span>Результат</span>
+                </h2>
                 <p>Выберите раздел слева или зафиксируйте проблему, чтобы начать коллективный цикл.</p>
               </div>
-              <span className="hero-number">01</span>
             </section>
 
             {nextAction && (
@@ -517,7 +525,7 @@ export default function AppNew() {
                   <h2>{nextAction.label}</h2>
                   <p className="muted">{nextAction.reason}</p>
                   <button className="primary" onClick={() => goSection(nextAction.section as Section)}>
-                    Перейти →
+                    Перейти
                   </button>
                 </div>
               </section>
@@ -569,7 +577,7 @@ export default function AppNew() {
                 <form onSubmit={doSearch} className="problem-form">
                   <input
                     id="global-search"
-                    placeholder="Введите запрос (минимум 2 символа)"
+                    placeholder="Поиск по разделам"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     required
@@ -777,7 +785,7 @@ export default function AppNew() {
                     key={item.id}
                     style={section === "goals" ? { cursor: "pointer" } : undefined}
                     onClick={section === "goals" ? () => goGoal(item.id) : undefined}
-                  >                      <span className="problem-icon">●</span>
+                  >
                       <div>
                         <h3>{item.title}</h3>
                         <p>{item.description}</p>
@@ -862,13 +870,13 @@ export default function AppNew() {
                         {section === "projects" && (
                           <div className="status-buttons">
                             {item.status !== "active" && (
-                              <button onClick={() => updateProjectStatus(item.id, "active")}>→ Активен</button>
+                              <button onClick={() => updateProjectStatus(item.id, "active")}>Активен</button>
                             )}
                             {item.status !== "completed" && (
-                              <button onClick={() => updateProjectStatus(item.id, "completed")}>→ Завершён</button>
+                              <button onClick={() => updateProjectStatus(item.id, "completed")}>Завершён</button>
                             )}
                             {item.status !== "on_hold" && (
-                              <button onClick={() => updateProjectStatus(item.id, "on_hold")}>→ На паузе</button>
+                              <button onClick={() => updateProjectStatus(item.id, "on_hold")}>На паузе</button>
                             )}
                           </div>
                         )}
@@ -889,7 +897,7 @@ export default function AppNew() {
                             ) : (
                               projectTasks[item.id].map((t) => (
                                 <div key={t.id} className="task-item">
-                                  <span className={`task-status ${t.status}`}>{t.status === "done" ? "✓" : "○"}</span>
+                                  <span className={`task-status ${t.status}`}><Icon name={t.status === "done" ? "check" : "circle"} /></span>
                                   <div>
                                     <strong>{t.title}</strong>
                                     {t.description && <p className="muted">{t.description}</p>}
@@ -905,7 +913,7 @@ export default function AppNew() {
                                       ) : (
                                         <button className="link-button" onClick={() => assignTaskToSelf(t.id)}>Взять себе</button>
                                       )}
-                                      <button className="link-button" onClick={() => completeTask(t.id)}>✓ Завершить</button>
+                                      <button className="link-button" onClick={() => completeTask(t.id)}>Завершить</button>
                                     </div>
                                   )}
                                 </div>
@@ -951,7 +959,7 @@ export default function AppNew() {
             <section className="panel">
               <div className="panel-heading">
                 <div>
-                  <span className="eyebrow">Goal Alignment</span>
+                  <span className="eyebrow">Согласование целей</span>
                   <h2>Новое предложение</h2>
                 </div>
               </div>
@@ -1009,8 +1017,7 @@ export default function AppNew() {
                       className={selectedDecisionId === decision.id ? "selected" : ""}
                       onClick={() => loadDecisionEvents(decision.id)}
                     >
-                      <span className="problem-icon">→</span>
-                      <div>
+                                            <div>
                         <h3>{decision.title}</h3>
                         <p>{decision.proposal}</p>
                         <small>

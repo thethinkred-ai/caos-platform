@@ -67,7 +67,6 @@ export function AIProposalsPanel() {
         <div className="problem-list">
           {pending.map((p) => (
             <article key={p.id}>
-              <span className="problem-icon" style={{ color: "var(--ai)" }}>◆</span>
               <div>
                 <h3>{p.suggestion}</h3>
                 <small>
@@ -94,7 +93,6 @@ export function AIProposalsPanel() {
           ))}
           {reviewed.slice(0, 5).map((p) => (
             <article key={p.id}>
-              <span className="problem-icon">·</span>
               <div>
                 <h3>
                   {p.suggestion} <span className="event-type-badge">{STATUS_LABELS[p.status] ?? p.status}</span>

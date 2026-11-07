@@ -20,7 +20,7 @@ type StuckState = {
   objects: Record<string, number>;
 };
 
-const ACCENT = "#e11d2a";
+const ACCENT = "var(--primary)";
 
 function currentPage(): string {
   const hash = window.location.hash.replace(/^#\/?/, "");
@@ -107,7 +107,7 @@ export function FeedbackWidget({ userId }: { userId: number }) {
           zIndex: 60,
           borderRadius: 999,
           border: "1px solid " + ACCENT,
-          background: "#fff",
+          background: "var(--surface)",
           color: ACCENT,
           fontWeight: 600,
           fontSize: 13,
@@ -137,7 +137,7 @@ export function FeedbackWidget({ userId }: { userId: number }) {
           width: "min(440px, calc(100vw - 36px))",
           maxHeight: "calc(100vh - 36px)",
           overflowY: "auto",
-          background: "#fff",
+          background: "var(--surface)",
           borderRadius: 14,
           border: "1px solid #e3e6ea",
           boxShadow: "0 18px 48px rgba(0,0,0,.22)",
@@ -148,7 +148,7 @@ export function FeedbackWidget({ userId }: { userId: number }) {
         {sent ? (
           <div>
             <h3 style={{ margin: "0 0 8px", fontSize: 16 }}>Спасибо, записали</h3>
-            <p style={{ margin: "0 0 14px", fontSize: 13, color: "#5b636e", lineHeight: 1.5 }}>
+            <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
               Сообщение ушло рабочей команде. Если нужен ответ лично — оставьте контакт в
               следующем сообщении или напишите на thethinkred@gmail.com.
             </p>
@@ -164,13 +164,13 @@ export function FeedbackWidget({ userId }: { userId: number }) {
                 type="button"
                 onClick={() => close(true)}
                 aria-label="Закрыть"
-                style={{ border: "none", background: "none", fontSize: 18, lineHeight: 1, cursor: "pointer", color: "#8b949e" }}
+                style={{ border: "none", background: "none", fontSize: 18, lineHeight: 1, cursor: "pointer", color: "var(--text-muted)" }}
               >
                 ×
               </button>
             </div>
 
-            <p style={{ margin: "0 0 12px", fontSize: 13, color: "#374151", lineHeight: 1.55 }}>
+            <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text)", lineHeight: 1.55 }}>
               {state?.stuck
                 ? state.message
                 : "Напишите, что не работает или чего не хватает. Сообщение читает рабочая команда, а не бот."}
@@ -219,7 +219,7 @@ export function FeedbackWidget({ userId }: { userId: number }) {
               }}
             />
 
-            <div style={{ fontSize: 11, color: "#8b949e", marginTop: 8 }}>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
               Страница: {currentPage()}
               {state?.stuck ? " · шаг: " + state.stage : ""}
             </div>
@@ -248,7 +248,7 @@ const btnPrimary: CSSProperties = {
   border: "none",
   borderRadius: 10,
   background: ACCENT,
-  color: "#fff",
+  color: "var(--on-primary)",
   fontWeight: 600,
   fontSize: 13,
   padding: "10px 14px",
@@ -258,8 +258,8 @@ const btnPrimary: CSSProperties = {
 const btnGhost: CSSProperties = {
   border: "1px solid #d6dae0",
   borderRadius: 10,
-  background: "#fff",
-  color: "#374151",
+  background: "var(--surface)",
+  color: "var(--text)",
   fontSize: 13,
   padding: "10px 14px",
   cursor: "pointer",
@@ -269,7 +269,7 @@ const chipStyle: CSSProperties = {
   border: "1px solid #d6dae0",
   borderRadius: 999,
   background: "#f7f8fa",
-  color: "#374151",
+  color: "var(--text)",
   fontSize: 12,
   padding: "5px 10px",
   cursor: "pointer",

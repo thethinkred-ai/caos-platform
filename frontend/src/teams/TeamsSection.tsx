@@ -63,7 +63,6 @@ export function TeamsSection({
           <div className="problem-list">
             {teams.map((team) => (
               <article key={team.id}>
-                <span className="problem-icon">✦</span>
                 <div>
                   <h3>{team.name}</h3>
                   <p>{team.description || "Описание пока не добавлено."}</p>

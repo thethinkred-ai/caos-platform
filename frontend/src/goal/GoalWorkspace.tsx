@@ -3,6 +3,7 @@ import { API_URL, request } from "../api/client";
 import { capabilityLabel, kindLabel, relationLabel, roleLabel, RESOURCE_STATUS_LABELS, RESOURCE_TYPE_LABELS, CRITERION_LABELS, statusLabel } from "../labels";
 import { LearningHint } from "../ui/LearningHint";
 import { CaosStatus } from "../ui/CaosStatus";
+import { Icon } from "../ui/Icon";
 import {
   CRITERION_TYPES,
   EVIDENCE_TYPES,
@@ -431,11 +432,11 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {(isOwner || myParticipation?.role === "coordinator") && !editing && (
               <button className="link-button" onClick={startEditing}>
-                ✏️ Изменить
+                <Icon name="edit" /> Изменить
               </button>
             )}
             <a href={`${API_URL}/goals/${goalId}/export`} target="_blank" rel="noopener" className="link-button">
-              ⬇ Экспорт
+              <Icon name="download" /> Экспорт
             </a>
             <button onClick={onBack}>← К списку</button>
           </div>
@@ -570,7 +571,6 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
           <div className="problem-list">
             {relations.map((r) => (
               <article key={r.id}>
-                <span className="problem-icon">→</span>
                 <div>
                   <h3>
                     {r.source_goal_id === goalId ? "Эта цель" : goalTitle(r.source_goal_id)}{" "}
@@ -622,7 +622,6 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
           <div className="problem-list">
             {participations.map((p) => (
               <article key={p.id}>
-                <span className="problem-icon">◦</span>
                 <div>
                   <h3>
                     {p.display_name} <span className="event-type-badge">{roleLabel(p.role)}</span>
@@ -692,7 +691,6 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
               const history = measurements[c.id] ?? [];
               return (
               <article key={c.id}>
-                <span className="problem-icon">≡</span>
                 <div>
                   <h3>
                     {c.name} <span className="event-type-badge">{CRITERION_LABELS[c.criterion_type] ?? c.criterion_type}</span>
@@ -836,7 +834,7 @@ export function GoalWorkspace({ goalId, goals, user, onBack, onNotice }: { goalI
           <div className="problem-list">
             {resources.map((r) => (
               <article key={r.id}>
-                <span className="problem-icon">{r.is_critical && r.status !== "secured" ? "⚠️" : "◈"}</span>
+                <Icon name="alert" />
                 <div>
                   <h3>
                     {r.name}

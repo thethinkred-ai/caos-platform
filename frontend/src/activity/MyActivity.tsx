@@ -95,8 +95,7 @@ export function MyActivity({ onOpenGoal }: { onOpenGoal?: (goalId: number) => vo
               const goal = goals.find((g) => g.id === c.goal_id);
               return (
                 <article key={c.id}>
-                  <span className="problem-icon">◈</span>
-                  <div>
+                    <div>
                     <h3>{c.description}</h3>
                     {c.expected_result && <p className="muted">Ожидание: {c.expected_result}</p>}
                     <small>
@@ -144,7 +143,6 @@ export function MyActivity({ onOpenGoal }: { onOpenGoal?: (goalId: number) => vo
           <div className="problem-list">
             {done.map((c) => (
               <article key={c.id}>
-                <span className="problem-icon">✓</span>
                 <div>
                   <h3>
                     {c.description} <CaosStatus status={c.status} label={statusLabel(c.status, "commitment")} />

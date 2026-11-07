@@ -93,7 +93,7 @@ export function DecisionProcess({
         <div style={{ marginTop: 8 }}>
           <b>
             За {votes.accept} · Против {votes.reject} · всего {votes.total}/{votes.quorum}
-            {votes.quorum_met ? " ✓" : " — кворум не собран"}
+            {votes.quorum_met ? "" : " — кворум не собран"}
           </b>
           {votes.own_vote && <small> · ваш голос: {VOTE_LABELS[votes.own_vote.variant] ?? votes.own_vote.variant}</small>}
           {open && canVote && !votes.own_vote && (

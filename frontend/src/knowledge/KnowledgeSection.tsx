@@ -136,7 +136,6 @@ export function KnowledgeSection({
           <div className="problem-list">
             {visible.map((item) => (
               <article key={item.id}>
-                <span className="problem-icon">✦</span>
                 <div>
                   <h3>{item.title}</h3>
                   <p>{item.content}</p>

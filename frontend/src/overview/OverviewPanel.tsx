@@ -63,7 +63,6 @@ export function OverviewPanel({
           <div className="problem-list">
             {activeCommitments.slice(0, 3).map((c) => (
               <article key={c.id}>
-                <span className="problem-icon">◈</span>
                 <div>
                   <h3>{c.description}</h3>
                   <small>
@@ -101,7 +100,6 @@ export function OverviewPanel({
           <div className="problem-list">
             {unread.slice(0, 3).map((n) => (
               <article key={n.id}>
-                <span className="problem-icon">!</span>
                 <div>
                   <h3>{n.message}</h3>
                   <small>{n.entity_type} #{n.entity_id}</small>
@@ -129,7 +127,6 @@ export function OverviewPanel({
           <div className="problem-list">
             {activeGoals.slice(0, 4).map((g) => (
               <article key={g.id}>
-                <span className="problem-icon">◎</span>
                 <div>
                   <h3>
                     <button className="link-button" onClick={() => onOpenGoal(g.id)}>
@@ -161,7 +158,6 @@ export function OverviewPanel({
           <div className="problem-list">
             {challenges.slice(0, 3).map((ch) => (
               <article key={ch.id}>
-                <span className="problem-icon">⚑</span>
                 <div>
                   <h3>{ch.claim}</h3>
                   <small>
@@ -185,7 +181,6 @@ export function OverviewPanel({
           <div className="problem-list">
             {auditEvents.slice(0, 5).map((ev) => (
               <article key={ev.id}>
-                <span className="problem-icon">·</span>
                 <div>
                   <h3>{ev.action}</h3>
                   <small>{ev.detail} — {new Date(ev.created_at).toLocaleDateString("ru-RU")}</small>

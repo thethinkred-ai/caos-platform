@@ -86,7 +86,6 @@ export function CompetencesSection({
           <div className="problem-list">
             {competences.map((c) => (
               <article key={c.id} className="competence-entry">
-                <span className="problem-icon">★</span>
                 <div>
                   <h3>{c.name}</h3>
                   {c.description && <p>{c.description}</p>}
