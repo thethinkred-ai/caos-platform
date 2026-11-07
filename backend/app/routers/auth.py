@@ -2,7 +2,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -213,7 +213,7 @@ def change_password(
 
 @router.post("/reset-password")
 @limiter.limit("5/minute")
-def reset_password(payload: ResetPasswordRequest, request: Request, db: Db) -> JSONResponse:
+def reset_password(payload: ResetPasswordRequest, request: Request, db: Db, background_tasks: BackgroundTasks) -> JSONResponse:
     user = db.scalar(select(User).where(User.email == payload.email.lower()))
     if user:
         raw_token, token_hash = make_email_token("reset", RESET_TOKEN_TTL)
@@ -221,7 +221,10 @@ def reset_password(payload: ResetPasswordRequest, request: Request, db: Db) -> J
         db.commit()
         settings = get_settings()
         reset_url = f"{settings.frontend_url}/auth/reset-password?token={raw_token}"
-        _send_email_safely(
+        # Send email in background — the HTTP response must not wait for SMTP.
+        # This also removes the timing oracle that reveals registered emails.
+        background_tasks.add_task(
+            _send_email_safely,
             payload.email.lower(),
             "Сброс пароля — CAOS",
             f"<p>Для сброса пароля перейдите по ссылке:</p>"
