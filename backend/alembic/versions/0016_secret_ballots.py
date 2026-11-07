@@ -34,11 +34,18 @@ def _secret() -> bytes:
 
 
 def upgrade() -> None:
-    op.add_column("decisions", sa.Column("ballot_secret", sa.Boolean(), nullable=False, server_default=sa.false()))
-    op.add_column("votes", sa.Column("voter_hash", sa.String(64), nullable=True))
-
+    # Базовая миграция 0001 сходяет любую БД к текущим моделям, поэтому на
+    # чистой базе столбцы/констрейнты 0016 могут уже существовать - всё
+    # добавляем только при отсутствии (как в 0013_deadlines).
     bind = op.get_bind()
-    rows = bind.execute(sa.text("SELECT id, decision_id, user_id FROM votes")).fetchall()
+    inspector = sa.inspect(bind)
+
+    if "ballot_secret" not in {c["name"] for c in inspector.get_columns("decisions")}:
+        op.add_column("decisions", sa.Column("ballot_secret", sa.Boolean(), nullable=False, server_default=sa.false()))
+    if "voter_hash" not in {c["name"] for c in inspector.get_columns("votes")}:
+        op.add_column("votes", sa.Column("voter_hash", sa.String(64), nullable=True))
+
+    rows = bind.execute(sa.text("SELECT id, decision_id, user_id FROM votes WHERE voter_hash IS NULL")).fetchall()
     for vote_id, decision_id, user_id in rows:
         digest = hmac.new(_secret(), f"{decision_id}:{user_id}".encode(), hashlib.sha256).hexdigest()
         bind.execute(
@@ -46,17 +53,32 @@ def upgrade() -> None:
             {"h": digest, "id": vote_id},
         )
 
+    vote_cons = {c.get("name") for c in inspector.get_unique_constraints("votes")}
+    user_id_nullable = next(
+        (c["nullable"] for c in inspector.get_columns("votes") if c["name"] == "user_id"), True
+    )
     with op.batch_alter_table("votes") as batch:
-        batch.alter_column("user_id", existing_type=sa.Integer(), nullable=True)
-        batch.drop_constraint("uq_vote_decision_user", type_="unique")
-        batch.create_unique_constraint("uq_vote_decision_voter", ["decision_id", "voter_hash"])
-    op.create_index("ix_votes_voter_hash", "votes", ["voter_hash"])
+        if not user_id_nullable:
+            batch.alter_column("user_id", existing_type=sa.Integer(), nullable=True)
+        if "uq_vote_decision_user" in vote_cons:
+            batch.drop_constraint("uq_vote_decision_user", type_="unique")
+        if "uq_vote_decision_voter" not in vote_cons:
+            batch.create_unique_constraint("uq_vote_decision_voter", ["decision_id", "voter_hash"])
+    if "ix_votes_voter_hash" not in {i["name"] for i in inspector.get_indexes("votes")}:
+        op.create_index("ix_votes_voter_hash", "votes", ["voter_hash"])
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    vote_cons = {c.get("name") for c in inspector.get_unique_constraints("votes")}
     with op.batch_alter_table("votes") as batch:
-        batch.drop_constraint("uq_vote_decision_voter", type_="unique")
-        batch.create_unique_constraint("uq_vote_decision_user", ["decision_id", "user_id"])
+        if "uq_vote_decision_voter" in vote_cons:
+            batch.drop_constraint("uq_vote_decision_voter", type_="unique")
+        if "uq_vote_decision_user" not in vote_cons:
+            batch.create_unique_constraint("uq_vote_decision_user", ["decision_id", "user_id"])
         batch.alter_column("user_id", existing_type=sa.Integer(), nullable=False)
-        batch.drop_column("voter_hash")
-    op.drop_column("decisions", "ballot_secret")
+        if "voter_hash" in {c["name"] for c in inspector.get_columns("votes")}:
+            batch.drop_column("voter_hash")
+    if "ballot_secret" in {c["name"] for c in inspector.get_columns("decisions")}:
+        op.drop_column("decisions", "ballot_secret")
