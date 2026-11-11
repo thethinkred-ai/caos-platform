@@ -39,10 +39,18 @@ jobs:
             docker compose -p caos-platform build backend frontend
             docker compose -p caos-platform run --rm --no-deps backend python -m alembic upgrade head
             docker compose -p caos-platform up -d --remove-orphans backend frontend
-            sleep 5
-            curl -fsS http://127.0.0.1:8000/health
-            # A v0.2 route must exist (401 = route present, auth required).
-            curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/goals/1/impact | grep -q 401
+            # Health checks with retry: a container recreated moments ago may
+            # still be booting - a single immediate probe once failed the whole
+            # deploy (2026-11-07: raced a concurrent manual deploy).
+            ok=""
+            for i in $(seq 1 12); do
+              if curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1 \
+                 && [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/goals/1/impact)" = "401" ]; then
+                ok=1; break
+              fi
+              sleep 5
+            done
+            [ -n "$ok" ] || { echo "health checks failed after 60s"; exit 1; }
 
             # Idempotently install the daily backup job (Step 23).
             # Script and cron file are versioned in scripts/; retention
