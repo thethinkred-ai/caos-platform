@@ -76,25 +76,42 @@ def _clear_auth_cookies(response: JSONResponse) -> None:
 @limiter.limit("5/minute")
 def register(payload: UserCreate, request: Request, db: Db) -> JSONResponse:
     email = payload.email.lower()
+    auto_verify = get_settings().auto_verify_email
     existing = db.scalar(select(User).where(User.email == email))
     if existing:
         # Same response as for a fresh registration (no user enumeration).
         # Re-send the verification link so a lost email cannot strand an
-        # unverified account forever.
+        # unverified account forever. In AUTO_VERIFY_EMAIL mode a lost
+        # email cannot strand anything — just verify the account.
         if not existing.is_verified and existing.password_hash:
-            raw_token, token_hash = make_email_token("verify", VERIFICATION_TOKEN_TTL)
-            existing.verification_token = token_hash
-            db.commit()
-            _verification_email(existing, raw_token)
+            if auto_verify:
+                existing.is_verified = True
+                existing.verification_token = None
+                db.commit()
+            else:
+                raw_token, token_hash = make_email_token("verify", VERIFICATION_TOKEN_TTL)
+                existing.verification_token = token_hash
+                db.commit()
+                _verification_email(existing, raw_token)
         return JSONResponse(status_code=201, content=_REGISTERED_MESSAGE)
-    raw_token, token_hash = make_email_token("verify", VERIFICATION_TOKEN_TTL)
-    user = User(
-        email=email,
-        password_hash=hash_password(payload.password),
-        is_verified=False,
-        verification_token=token_hash,
-        consent_accepted_at=datetime.now(UTC),
-    )
+    raw_token = None
+    if auto_verify:
+        user = User(
+            email=email,
+            password_hash=hash_password(payload.password),
+            is_verified=True,
+            verification_token=None,
+            consent_accepted_at=datetime.now(UTC),
+        )
+    else:
+        raw_token, token_hash = make_email_token("verify", VERIFICATION_TOKEN_TTL)
+        user = User(
+            email=email,
+            password_hash=hash_password(payload.password),
+            is_verified=False,
+            verification_token=token_hash,
+            consent_accepted_at=datetime.now(UTC),
+        )
     user.profile = UserProfile(display_name=payload.display_name, bio="")
     db.add(user)
     try:
@@ -103,7 +120,8 @@ def register(payload: UserCreate, request: Request, db: Db) -> JSONResponse:
         # Concurrent registration of the same email — behave as if it existed.
         db.rollback()
         return JSONResponse(status_code=201, content=_REGISTERED_MESSAGE)
-    _verification_email(user, raw_token)
+    if raw_token is not None:
+        _verification_email(user, raw_token)
     return JSONResponse(status_code=201, content=_REGISTERED_MESSAGE)
 
 
@@ -252,7 +270,7 @@ def reset_password_confirm(payload: ResetPasswordConfirm, db: Db) -> JSONRespons
 def export_user_data(db: Db, user: Annotated[User, Depends(current_user)]) -> JSONResponse:
     from ..models import Problem, Goal, Project, Decision, KnowledgeItem, Competence
     data = {
-        "user": UserOut.model_validate(user).model_dump(),
+        "user": UserOut.model_validate(user).model_dump(mode="json"),
         "problems": [{"id": p.id, "title": p.title, "description": p.description, "status": p.status, "created_at": str(p.created_at)} for p in db.scalars(select(Problem).where(Problem.author_id == user.id))],
         "goals": [{"id": g.id, "title": g.title, "description": g.description, "status": g.status, "created_at": str(g.created_at)} for g in db.scalars(select(Goal).where(Goal.owner_id == user.id))],
         "projects": [{"id": p.id, "title": p.title, "description": p.description, "status": p.status, "created_at": str(p.created_at)} for p in db.scalars(select(Project).where(Project.owner_id == user.id))],

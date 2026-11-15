@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = "noreply@caos.thinkred.ru"
     audit_retention_days: int = 90
+    # Local development helpers. LOG_UNSENT_EMAILS prints the email body
+    # (including the verification link) to the log when SMTP is not
+    # configured; AUTO_VERIFY_EMAIL skips email verification entirely.
+    # AUTO_VERIFY_EMAIL is refused on anything but SQLite dev databases.
+    log_unsent_emails: bool = False
+    auto_verify_email: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -45,6 +51,8 @@ class Settings(BaseSettings):
                 raise RuntimeError("JWT_SECRET must be set to a non-default value in production")
             if "change-me" in self.database_url:
                 raise RuntimeError("POSTGRES_PASSWORD must be set to a non-default value in production")
+            if self.auto_verify_email:
+                raise RuntimeError("AUTO_VERIFY_EMAIL is a local development flag; it must never run with a production database")
 
     @property
     def cors_origin_list(self) -> list[str]:
